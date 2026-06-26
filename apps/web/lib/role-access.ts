@@ -55,7 +55,7 @@ export const roles: Record<RoleId, RoleConfig> = {
     label: 'Global Admin',
     badge: 'Platform',
     description: 'Can provision tenants and manage SaaS-level operations only.',
-    defaultSection: 'platform-tenants',
+    defaultSection: 'overview',
   },
   admin: {
     id: 'admin',
@@ -83,10 +83,10 @@ export const roles: Record<RoleId, RoleConfig> = {
 export const screens: Record<DashboardSection, ScreenConfig> = {
   overview: {
     section: 'overview',
-    label: 'Overview',
-    description: 'Organization dashboard metrics and operational summary.',
+    label: 'Summary',
+    description: 'Role-specific dashboard metrics and operational summary.',
     icon: Home,
-    allowedRoles: ['admin', 'teacher'],
+    allowedRoles: ['platform_admin', 'admin', 'teacher'],
   },
   'platform-tenants': {
     section: 'platform-tenants',

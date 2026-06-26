@@ -1,0 +1,55 @@
+export const colors = {
+  app: {
+    background: 'bg-[#F7F4EE]',
+    backgroundHover: 'hover:bg-[#F7F4EE]',
+    foreground: 'text-[#151515]',
+    foregroundHover: 'hover:text-[#151515]',
+    card: 'bg-white',
+    border: 'border-[#E5DED3]',
+    borderBg: 'bg-[#E5DED3]',
+    borderDashed: 'border-[#E5DED3]',
+    muted: 'text-[#6F6A62]',
+    mutedLight: 'text-[#9A948A]',
+    dark: 'bg-[#151515]',
+    darkAlt: 'bg-[#111827]',
+  },
+  brand: {
+    text: 'text-[#2563EB]',
+    bg: 'bg-[#2563EB]',
+    subtleBg: 'bg-[#EAF1FF]',
+    badge: 'bg-[#EAF1FF] text-[#2563EB]',
+    icon: 'text-[#2563EB]',
+    focusRing: 'focus:ring-[#2563EB]',
+    hoverBg: 'hover:bg-[#EAF1FF]',
+  },
+  success: {
+    text: 'text-[#16A34A]',
+    bg: 'bg-[#16A34A]',
+    subtleBg: 'bg-[#EAF8EF]',
+    badge: 'bg-[#EAF8EF] text-[#16A34A]',
+    icon: 'text-[#16A34A]',
+  },
+  warning: {
+    text: 'text-[#B45309]',
+    subtleBg: 'bg-[#FFF4D6]',
+    badge: 'bg-[#FFF4D6] text-[#B45309]',
+    icon: 'text-[#B45309]',
+  },
+  danger: {
+    text: 'text-[#DC2626]',
+    subtleBg: 'bg-[#FEECEC]',
+    badge: 'bg-[#FEECEC] text-[#DC2626]',
+  },
+} as const
+
+export const dashboardColors = {
+  page: `${colors.app.background} ${colors.app.foreground}`,
+  card: `${colors.app.border} ${colors.app.card}`,
+  muted: colors.app.muted,
+  panel: `${colors.app.border} ${colors.app.background}`,
+  link: `font-semibold ${colors.brand.text}`,
+  activeNav: `${colors.brand.subtleBg} ${colors.brand.text}`,
+  inactiveNav: `${colors.app.muted} ${colors.app.backgroundHover} ${colors.app.foregroundHover}`,
+  tableHeader: `${colors.app.background} ${colors.app.muted}`,
+  focusAvatar: `${colors.brand.focusRing} focus:ring-offset-2`,
+} as const

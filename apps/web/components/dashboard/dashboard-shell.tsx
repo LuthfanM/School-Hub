@@ -9,6 +9,7 @@ import {
   type RoleId,
 } from '../../lib/role-access'
 import { DashboardRoleContext } from '../../lib/role-context'
+import { dashboardColors } from '../../styles/colors'
 import { DashboardOverview } from './dashboard-overview'
 import { DashboardSidebar } from './dashboard-sidebar'
 
@@ -56,7 +57,7 @@ export function DashboardShell({ initialPlatformRole }: DashboardShellProps) {
 
   return (
     <DashboardRoleContext.Provider value={{ role, setRole: setDemoRole }}>
-      <main className="min-h-screen bg-[#F7F4EE] text-[#151515]">
+      <main className={`min-h-screen ${dashboardColors.page}`}>
         <div className="grid lg:grid-cols-[280px_1fr]">
           <div className="hidden lg:block">
             <DashboardSidebar />

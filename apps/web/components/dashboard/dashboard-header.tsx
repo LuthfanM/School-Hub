@@ -21,6 +21,7 @@ import { Bell, Search } from 'lucide-react'
 
 import { roles, type RoleId } from '../../lib/role-access'
 import { useDashboardRole } from '../../lib/role-context'
+import { colors, dashboardColors } from '../../styles/colors'
 
 interface DashboardHeaderProps {
   subtitle: string
@@ -29,17 +30,22 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({ subtitle, title }: DashboardHeaderProps) {
   const { role, setRole } = useDashboardRole()
+  const searchPlaceholder = role === 'platform_admin'
+    ? 'Search tenants, admins'
+    : role === 'student'
+      ? 'Search courses, lessons'
+      : 'Search students, classes'
 
   return (
-    <header className="mb-6 flex flex-col justify-between gap-4 rounded-[24px] border border-[#E5DED3] bg-white p-5 shadow-sm lg:flex-row lg:items-center">
+    <header className={`mb-6 flex flex-col justify-between gap-4 rounded-[24px] border p-5 shadow-sm lg:flex-row lg:items-center ${dashboardColors.card}`}>
       <div>
-        <Badge className="mb-3 bg-[#EAF1FF] text-[#2563EB]">{roles[role].badge}</Badge>
+        <Badge className={`mb-3 ${colors.brand.badge}`}>{roles[role].badge}</Badge>
         <p className="text-3xl font-bold tracking-tight">{title}</p>
-        <p className="mt-1 max-w-2xl text-[#6F6A62]">{subtitle}</p>
+        <p className={`mt-1 max-w-2xl ${colors.app.muted}`}>{subtitle}</p>
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <select
-          className="h-11 rounded-full border border-[#E5DED3] bg-[#F7F4EE] px-4 text-sm font-semibold text-[#151515]"
+          className={`h-11 rounded-full border px-4 text-sm font-semibold ${dashboardColors.panel} ${colors.app.foreground}`}
           onChange={(event) => setRole(event.target.value as RoleId)}
           value={role}
         >
@@ -51,7 +57,7 @@ export function DashboardHeader({ subtitle, title }: DashboardHeaderProps) {
         </select>
         <div className="relative">
           <Search className="h-4 w-4" />
-          <Input className="h-11 rounded-full border-[#E5DED3] bg-[#F7F4EE] pl-10" placeholder="Search students, classes" />
+          <Input className={`h-11 rounded-full pl-10 ${dashboardColors.panel}`} placeholder={searchPlaceholder} />
         </div>
         {role === 'admin' || role === 'teacher' ? (
           <Button asChild>
@@ -61,7 +67,7 @@ export function DashboardHeader({ subtitle, title }: DashboardHeaderProps) {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link to="/dashboard/$section" params={{ section: role === 'platform_admin' ? 'platform-tenants' : role === 'student' ? 'my-progress' : 'messages' }} className="grid h-11 w-11 place-items-center rounded-full border border-[#E5DED3] bg-white">
+              <Link to="/dashboard/$section" params={{ section: role === 'platform_admin' ? 'platform-tenants' : role === 'student' ? 'my-progress' : 'messages' }} className={`grid h-11 w-11 place-items-center rounded-full border ${dashboardColors.card}`}>
                 <Bell className="h-5 w-5" />
               </Link>
             </TooltipTrigger>
@@ -70,9 +76,9 @@ export function DashboardHeader({ subtitle, title }: DashboardHeaderProps) {
         </TooltipProvider>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="rounded-full outline-none focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2">
+            <button className={`rounded-full outline-none focus:ring-2 ${dashboardColors.focusAvatar}`}>
               <Avatar>
-                <AvatarFallback className="bg-[#111827] text-white">AD</AvatarFallback>
+                <AvatarFallback className={`${colors.app.darkAlt} text-white`}>AD</AvatarFallback>
               </Avatar>
             </button>
           </DropdownMenuTrigger>

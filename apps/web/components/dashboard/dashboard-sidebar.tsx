@@ -4,6 +4,7 @@ import { HelpCircle, LogOut } from 'lucide-react'
 
 import { getScreensForRole } from '../../lib/role-access'
 import { useDashboardRole } from '../../lib/role-context'
+import { colors, dashboardColors } from '../../styles/colors'
 
 export function DashboardSidebar() {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
@@ -14,16 +15,16 @@ export function DashboardSidebar() {
     : 'overview'
 
   return (
-    <aside className="flex min-h-screen flex-col justify-between border-r border-[#E5DED3] bg-white p-4">
+    <aside className={`flex min-h-screen flex-col justify-between border-r p-4 ${dashboardColors.card}`}>
       <div>
         <Link to="/" className="mb-8 flex items-center gap-3 px-2">
-          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#151515] text-sm font-bold text-white">C</span>
+          <span className={`grid h-10 w-10 place-items-center rounded-2xl text-sm font-bold text-white ${colors.app.dark}`}>C</span>
           <span>
             <span className="block text-xl font-bold leading-none">SchoolHub</span>
-            <span className="text-xs text-[#6F6A62]">School Hub</span>
+            <span className={`text-xs ${colors.app.muted}`}>School Hub</span>
           </span>
         </Link>
-        <Separator className="mb-4 bg-[#E5DED3]" />
+        <Separator className={`mb-4 ${colors.app.borderBg}`} />
         <nav className="space-y-1">
           {navItems.map(({ section, label, icon: Icon }) => (
             <Link
@@ -32,8 +33,8 @@ export function DashboardSidebar() {
               params={section === 'overview' ? undefined : { section }}
               className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition ${
                 section === activeSection
-                  ? 'bg-[#EAF1FF] text-[#2563EB]'
-                  : 'text-[#6F6A62] hover:bg-[#F7F4EE] hover:text-[#151515]'
+                  ? dashboardColors.activeNav
+                  : dashboardColors.inactiveNav
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -43,16 +44,16 @@ export function DashboardSidebar() {
         </nav>
       </div>
       <div className="space-y-1">
-        <Separator className="mb-3 bg-[#E5DED3]" />
+        <Separator className={`mb-3 ${colors.app.borderBg}`} />
         <Link
           to={role === 'platform_admin' ? '/dashboard/$section' : '/demo'}
           params={role === 'platform_admin' ? { section: 'platform-settings' } : undefined}
-          className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium text-[#6F6A62] hover:bg-[#F7F4EE]"
+          className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium ${dashboardColors.inactiveNav}`}
         >
           <HelpCircle className="h-4 w-4" />
           Help center
         </Link>
-        <Link to="/auth/login" className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium text-[#6F6A62] hover:bg-[#F7F4EE]">
+        <Link to="/auth/login" className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium ${dashboardColors.inactiveNav}`}>
           <LogOut className="h-4 w-4" />
           Logout
         </Link>

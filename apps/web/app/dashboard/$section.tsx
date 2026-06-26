@@ -13,6 +13,8 @@ import {
   screens,
 } from '../../lib/role-access'
 import { useDashboardRole } from '../../lib/role-context'
+import { PlatformSettingsScreen, PlatformTenantsScreen } from '../../components/dashboard/platform-screens'
+import { colors, dashboardColors } from '../../styles/colors'
 
 export const Route = createFileRoute('/dashboard/$section')({
   component: DashboardSectionPage,
@@ -26,11 +28,13 @@ function DashboardSectionPage() {
   const title = screen?.label ?? 'Unknown Section'
   const isBilling = normalizedSection === 'billing'
   const hasAccess = normalizedSection ? canAccessScreen(role, normalizedSection) : false
+  const isPlatformTenants = normalizedSection === 'platform-tenants'
+  const isPlatformSettings = normalizedSection === 'platform-settings'
 
   return (
-    <main className="min-h-screen bg-[#F7F4EE] p-4 text-[#151515] sm:p-8 lg:col-start-2">
+    <main className={`min-h-screen p-4 sm:p-8 lg:col-start-2 ${dashboardColors.page}`}>
       <div className="mx-auto max-w-6xl">
-        <Link to="/dashboard" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[#6F6A62] hover:text-[#151515]">
+        <Link to="/dashboard" className={`mb-5 inline-flex items-center gap-2 text-sm font-semibold ${colors.app.muted} ${colors.app.foregroundHover}`}>
           <ArrowLeft className="h-4 w-4" />
           Back to overview
         </Link>
@@ -40,14 +44,17 @@ function DashboardSectionPage() {
             sectionTitle={title}
           />
         ) : null}
+        {hasAccess && isPlatformTenants ? <PlatformTenantsScreen /> : null}
+        {hasAccess && isPlatformSettings ? <PlatformSettingsScreen /> : null}
         {hasAccess ? (
-        <Card className="rounded-[28px] border-[#E5DED3] bg-white">
+        !isPlatformTenants && !isPlatformSettings ? (
+        <Card className={`rounded-[28px] ${dashboardColors.card}`}>
           <CardContent className="p-6 sm:p-8">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#2563EB]">{roles[role].badge}</p>
+              <p className={`text-sm font-bold uppercase tracking-[0.18em] ${colors.brand.text}`}>{roles[role].badge}</p>
               <h1 className="mt-2 text-4xl font-bold tracking-tight">{title}</h1>
-              <p className="mt-3 max-w-2xl text-[#6F6A62]">
+              <p className={`mt-3 max-w-2xl ${colors.app.muted}`}>
                 {screen?.description ?? 'This route is not described yet.'}
               </p>
             </div>
@@ -67,11 +74,11 @@ function DashboardSectionPage() {
           </div>
 
           {isBilling ? (
-            <Card className="mt-8 rounded-[24px] border-[#E5DED3] bg-[#FFF4D6]">
+            <Card className={`mt-8 rounded-[24px] border ${colors.app.border} ${colors.warning.subtleBg}`}>
               <CardContent className="p-6">
-              <CircleAlert className="mb-4 h-8 w-8 text-[#B45309]" />
+              <CircleAlert className={`mb-4 h-8 w-8 ${colors.warning.icon}`} />
               <h2 className="text-xl font-bold">You do not have permission to view billing settings.</h2>
-              <p className="mt-2 text-[#6F6A62]">Contact your school admin to request billing access.</p>
+              <p className={`mt-2 ${colors.app.muted}`}>Contact your school admin to request billing access.</p>
               <Button asChild className="mt-5">
                 <Link to="/dashboard">Return to Dashboard</Link>
               </Button>
@@ -80,15 +87,15 @@ function DashboardSectionPage() {
           ) : (
             <>
               <div className="relative mt-8">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6F6A62]" />
-                <Input className="h-12 rounded-full border-[#E5DED3] bg-[#F7F4EE] pl-10" placeholder={`Search ${title.toLowerCase()}`} />
+                <Search className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${colors.app.muted}`} />
+                <Input className={`h-12 rounded-full pl-10 ${dashboardColors.panel}`} placeholder={`Search ${title.toLowerCase()}`} />
               </div>
               <div className="mt-6 grid gap-4 md:grid-cols-3">
                 {['Active', 'Pending review', 'Completed'].map((status, index) => (
-                  <Link key={status} to="/dashboard" className="rounded-[24px] border border-[#E5DED3] bg-[#F7F4EE] p-5 transition hover:-translate-y-1 hover:bg-[#EAF1FF]">
+                  <Link key={status} to="/dashboard" className={`rounded-[24px] border p-5 transition hover:-translate-y-1 ${dashboardColors.panel} ${colors.brand.hoverBg}`}>
                     <p className="font-mono text-3xl font-semibold">{[128, 18, 94][index]}</p>
                     <Badge className="mt-2" variant={index === 1 ? 'warning' : 'secondary'}>{status}</Badge>
-                    <p className="mt-2 text-sm leading-6 text-[#6F6A62]">Open the overview to inspect details and next steps.</p>
+                    <p className={`mt-2 text-sm leading-6 ${colors.app.muted}`}>Open the overview to inspect details and next steps.</p>
                   </Link>
                 ))}
               </div>
@@ -97,9 +104,9 @@ function DashboardSectionPage() {
                   <TabsTrigger value="empty">Empty</TabsTrigger>
                   <TabsTrigger value="loading">Loading</TabsTrigger>
                 </TabsList>
-                <TabsContent value="empty" className="rounded-[24px] border border-dashed border-[#E5DED3] bg-white p-8 text-center">
+                <TabsContent value="empty" className={`rounded-[24px] border border-dashed p-8 text-center ${colors.app.borderDashed} ${colors.app.card}`}>
                   <h2 className="text-xl font-bold">No live {title.toLowerCase()} data connected yet.</h2>
-                  <p className="mx-auto mt-2 max-w-xl text-[#6F6A62]">
+                  <p className={`mx-auto mt-2 max-w-xl ${colors.app.muted}`}>
                     This is ready for API-backed data later. For now, use the buttons to confirm the screen flow.
                   </p>
                   <div className="mt-5 flex justify-center gap-3">
@@ -111,7 +118,7 @@ function DashboardSectionPage() {
                     </Button>
                   </div>
                 </TabsContent>
-                <TabsContent value="loading" className="rounded-[24px] border border-[#E5DED3] bg-white p-8">
+                <TabsContent value="loading" className={`rounded-[24px] border p-8 ${dashboardColors.card}`}>
                   <Skeleton className="h-8 w-48" />
                   <div className="mt-6 space-y-3">
                     <Skeleton className="h-14 w-full" />
@@ -124,6 +131,7 @@ function DashboardSectionPage() {
           )}
           </CardContent>
         </Card>
+        ) : null
         ) : null}
       </div>
     </main>
@@ -138,11 +146,11 @@ function RestrictedSection({
   sectionTitle: string
 }) {
   return (
-    <Card className="rounded-[28px] border-[#E5DED3] bg-white">
+    <Card className={`rounded-[28px] ${dashboardColors.card}`}>
       <CardContent className="p-8">
-        <CircleAlert className="mb-5 h-10 w-10 text-[#B45309]" />
+        <CircleAlert className={`mb-5 h-10 w-10 ${colors.warning.icon}`} />
         <h1 className="text-3xl font-bold">Restricted screen</h1>
-        <p className="mt-3 max-w-2xl text-[#6F6A62]">
+        <p className={`mt-3 max-w-2xl ${colors.app.muted}`}>
           {roleLabel} cannot access {sectionTitle}. This screen is hidden by role policy until the user has the correct organization role or explicit platform support access.
         </p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
