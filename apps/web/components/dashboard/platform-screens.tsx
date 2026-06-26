@@ -1,8 +1,17 @@
-import { Link } from '@tanstack/react-router'
+import { useEffect, useMemo, useState } from 'react'
 import { Badge } from '@schoolhub/ui/components/badge'
 import { Button } from '@schoolhub/ui/components/button'
 import { Card, CardContent } from '@schoolhub/ui/components/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@schoolhub/ui/components/dialog'
 import { Input } from '@schoolhub/ui/components/input'
+import { Textarea } from '@schoolhub/ui/components/textarea'
 import {
   Table,
   TableBody,
@@ -24,27 +33,55 @@ import {
   Settings2,
   ShieldCheck,
 } from 'lucide-react'
+
+import { apiRequest } from '../../lib/api'
 import { colors, dashboardColors } from '../../styles/colors'
 
-const tenantRows = [
-  ['Al Hikmah School', 'al-hikmah', 'active', 'admin@alhikmah.sch.id', '128 members', '2 hours ago'],
-  ['Nusantara Academy', 'nusantara-academy', 'pending_setup', 'owner@nusantara.edu', 'Awaiting admin', '1 day ago'],
-  ['Bina Insan Program', 'bina-insan', 'suspended', 'ops@binainsan.org', '42 members', '5 days ago'],
-  ['Cendekia Learning', 'cendekia', 'active', 'admin@cendekia.id', '76 members', 'Today'],
-]
+interface PlatformTenant {
+  id: string
+  name: string
+  slug: string
+  status: string
+  description: string | null
+  customDomain: string | null
+  firstAdminEmail: string | null
+  memberCount: number
+  pendingInvitationCount: number
+  createdAt: string
+}
 
-const setupQueue = [
-  ['Nusantara Academy', 'Invite first organization admin', 'pending_setup'],
-  ['Harapan Bangsa', 'Confirm custom domain', 'pending_setup'],
-  ['Bina Insan Program', 'Review suspension reason', 'suspended'],
-]
+interface PlatformTenantListResponse {
+  tenants: PlatformTenant[]
+}
+
+interface PlatformTenantCreateResponse {
+  tenant: PlatformTenant
+}
+
+interface CreateTenantForm {
+  name: string
+  slug: string
+  description: string
+  customDomain: string
+  firstAdminEmail: string
+  firstAdminPassword: string
+}
+
+const emptyCreateTenantForm: CreateTenantForm = {
+  name: '',
+  slug: '',
+  description: '',
+  customDomain: '',
+  firstAdminEmail: '',
+  firstAdminPassword: '',
+}
 
 const settingsGroups = [
   {
     title: 'Tenant onboarding',
     icon: Building2,
     items: [
-      ['Default tenant status', 'Pending setup'],
+      ['Default tenant status', 'Pending setup when first admin is invited'],
       ['First admin provisioning', 'Invite-only'],
       ['Self-registration', 'Disabled'],
     ],
@@ -70,8 +107,103 @@ const settingsGroups = [
 ]
 
 export function PlatformTenantsScreen() {
+  const [tenants, setTenants] = useState<PlatformTenant[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+  const [form, setForm] = useState<CreateTenantForm>(emptyCreateTenantForm)
+
+  useEffect(() => {
+    let isMounted = true
+
+    apiRequest<PlatformTenantListResponse>('/api/platform/tenants')
+      .then((response) => {
+        if (!isMounted) return
+        setTenants(response.tenants)
+        setError(null)
+      })
+      .catch((requestError: unknown) => {
+        if (!isMounted) return
+        setError(requestError instanceof Error ? requestError.message : 'Failed to load tenants.')
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const filteredTenants = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+
+    if (!normalizedQuery) return tenants
+
+    return tenants.filter((tenant) => {
+      return [
+        tenant.name,
+        tenant.slug,
+        tenant.status,
+        tenant.firstAdminEmail ?? '',
+        tenant.customDomain ?? '',
+      ].some((value) => value.toLowerCase().includes(normalizedQuery))
+    })
+  }, [searchQuery, tenants])
+
+  const setupQueue = tenants.filter((tenant) => {
+    return tenant.status !== 'active' || tenant.pendingInvitationCount > 0
+  })
+
+  function openCreateTenant(prefillAdminEmail = false) {
+    setForm({
+      ...emptyCreateTenantForm,
+      firstAdminEmail: prefillAdminEmail ? '' : emptyCreateTenantForm.firstAdminEmail,
+    })
+    setError(null)
+    setIsCreateOpen(true)
+  }
+
+  function updateForm(field: keyof CreateTenantForm, value: string) {
+    setForm((currentForm) => ({
+      ...currentForm,
+      [field]: field === 'slug' ? slugify(value) : value,
+      ...(field === 'name' && !currentForm.slug ? { slug: slugify(value) } : {}),
+    }))
+  }
+
+  async function createTenant(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsCreating(true)
+    setError(null)
+
+    try {
+      const response = await apiRequest<PlatformTenantCreateResponse>('/api/platform/tenants', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: form.name,
+          slug: form.slug,
+          description: form.description || undefined,
+          customDomain: form.customDomain || undefined,
+          firstAdminEmail: form.firstAdminEmail || undefined,
+          firstAdminPassword: form.firstAdminPassword || undefined,
+        }),
+      })
+
+      setTenants((currentTenants) => [response.tenant, ...currentTenants])
+      setForm(emptyCreateTenantForm)
+      setIsCreateOpen(false)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Failed to create tenant.')
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6">
       <Card className={`rounded-[28px] ${dashboardColors.card}`}>
         <CardContent className="p-6 sm:p-8">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
@@ -83,45 +215,78 @@ export function PlatformTenantsScreen() {
               </p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Button asChild>
-                <Link to="/demo"><Building2 className="h-4 w-4" /> Create Tenant</Link>
+              <Button type="button" onClick={() => openCreateTenant(false)}>
+                <Building2 className="h-4 w-4" /> Create Tenant
               </Button>
-              <Button asChild variant="secondary">
-                <Link to="/demo"><MailPlus className="h-4 w-4" /> Invite Admin</Link>
+              <Button type="button" variant="secondary" onClick={() => openCreateTenant(true)}>
+                <MailPlus className="h-4 w-4" /> Invite Admin
               </Button>
             </div>
           </div>
 
           <div className="relative mt-8">
             <Search className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 ${colors.app.muted}`} />
-            <Input className={`h-12 rounded-full pl-10 ${dashboardColors.panel}`} placeholder="Search tenants by school, slug, or admin email" />
+            <Input
+              className={`h-12 rounded-full pl-10 ${dashboardColors.panel}`}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search tenants by school, slug, domain, status, or admin email"
+              value={searchQuery}
+            />
           </div>
 
-          <div className={`mt-6 overflow-hidden rounded-2xl border ${colors.app.border}`}>
+          {error ? (
+            <div className={`mt-6 rounded-2xl border p-4 text-sm ${colors.danger.subtleBg} ${colors.app.border}`}>
+              {error}
+            </div>
+          ) : null}
+
+          <div className={`mt-6 overflow-x-auto rounded-2xl border ${colors.app.border}`}>
             <Table>
               <TableHeader className={dashboardColors.tableHeader}>
                 <TableRow>
-                  {['Organization', 'Slug', 'Status', 'First admin', 'Usage', 'Last activity', 'Action'].map((head) => (
-                    <TableHead key={head} className="font-semibold">{head}</TableHead>
+                  {['Organization', 'Slug', 'Status', 'First admin', 'Usage', 'Created', 'Action'].map((head) => (
+                    <TableHead key={head} className="whitespace-nowrap font-semibold">{head}</TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tenantRows.map(([name, slug, status, admin, usage, activity]) => (
-                  <TableRow key={slug} className={`${colors.app.border} ${colors.app.backgroundHover}`}>
-                    <TableCell className="font-semibold">{name}</TableCell>
-                    <TableCell className={`font-mono text-sm ${colors.app.muted}`}>{slug}</TableCell>
-                    <TableCell><TenantStatus status={status} /></TableCell>
-                    <TableCell className={colors.app.muted}>{admin}</TableCell>
-                    <TableCell>{usage}</TableCell>
-                    <TableCell className={colors.app.muted}>{activity}</TableCell>
-                    <TableCell>
-                      <Button asChild size="sm" variant="secondary">
-                        <Link to="/demo">Review</Link>
-                      </Button>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className={`h-28 text-center ${colors.app.muted}`}>
+                      Loading tenants...
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : null}
+                {!isLoading && filteredTenants.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-40 text-center">
+                      <div className="mx-auto max-w-md">
+                        <Building2 className={`mx-auto mb-3 h-8 w-8 ${colors.app.muted}`} />
+                        <p className="font-semibold">No tenants found.</p>
+                        <p className={`mt-2 text-sm ${colors.app.muted}`}>
+                          Create a tenant from this page, or run the platform tenant seed to populate sample organizations.
+                        </p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+                {!isLoading
+                  ? filteredTenants.map((tenant) => (
+                    <TableRow key={tenant.id} className={`${colors.app.border} ${colors.app.backgroundHover}`}>
+                      <TableCell className="min-w-56 font-semibold">{tenant.name}</TableCell>
+                      <TableCell className={`whitespace-nowrap font-mono text-sm ${colors.app.muted}`}>{tenant.slug}</TableCell>
+                      <TableCell><TenantStatus status={tenant.status} /></TableCell>
+                      <TableCell className={colors.app.muted}>{tenant.firstAdminEmail ?? 'Not invited'}</TableCell>
+                      <TableCell className="whitespace-nowrap">{formatUsage(tenant)}</TableCell>
+                      <TableCell className={`whitespace-nowrap ${colors.app.muted}`}>{formatDate(tenant.createdAt)}</TableCell>
+                      <TableCell>
+                        <Button size="sm" type="button" variant="secondary">
+                          Review
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                  : null}
               </TableBody>
             </Table>
           </div>
@@ -134,24 +299,39 @@ export function PlatformTenantsScreen() {
             <CircleAlert className={`h-5 w-5 ${colors.warning.icon}`} />
             <p className="text-lg font-bold">Operational setup queue</p>
           </div>
-          <div className="grid gap-3 lg:grid-cols-3">
-            {setupQueue.map(([name, task, status]) => (
-              <Link key={name} to="/demo" className={`rounded-2xl border p-4 transition ${dashboardColors.panel} ${colors.brand.hoverBg}`}>
-                <TenantStatus status={status} />
-                <p className="mt-3 font-semibold">{name}</p>
-                <p className={`mt-1 text-sm ${colors.app.muted}`}>{task}</p>
-              </Link>
-            ))}
-          </div>
+          {setupQueue.length > 0 ? (
+            <div className="grid gap-3 lg:grid-cols-3">
+              {setupQueue.map((tenant) => (
+                <div key={tenant.id} className={`rounded-2xl border p-4 ${dashboardColors.panel}`}>
+                  <TenantStatus status={tenant.status} />
+                  <p className="mt-3 font-semibold">{tenant.name}</p>
+                  <p className={`mt-1 text-sm ${colors.app.muted}`}>{getSetupTask(tenant)}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={`rounded-2xl border border-dashed p-6 text-sm ${colors.app.borderDashed} ${colors.app.muted}`}>
+              No tenant setup tasks right now.
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      <CreateTenantDialog
+        form={form}
+        isCreating={isCreating}
+        isOpen={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        onSubmit={createTenant}
+        onUpdateForm={updateForm}
+      />
     </div>
   )
 }
 
 export function PlatformSettingsScreen() {
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6">
       <Card className={`rounded-[28px] ${dashboardColors.card}`}>
         <CardContent className="p-6 sm:p-8">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
@@ -216,6 +396,113 @@ export function PlatformSettingsScreen() {
   )
 }
 
+function CreateTenantDialog({
+  form,
+  isCreating,
+  isOpen,
+  onOpenChange,
+  onSubmit,
+  onUpdateForm,
+}: {
+  form: CreateTenantForm
+  isCreating: boolean
+  isOpen: boolean
+  onOpenChange: (isOpen: boolean) => void
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
+  onUpdateForm: (field: keyof CreateTenantForm, value: string) => void
+}) {
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Create tenant</DialogTitle>
+          <DialogDescription>
+            Provision a school workspace. Add the first admin email when you are ready to invite them.
+          </DialogDescription>
+        </DialogHeader>
+        <form className="space-y-5" onSubmit={onSubmit}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="School name">
+              <Input
+                autoFocus
+                onChange={(event) => onUpdateForm('name', event.target.value)}
+                placeholder="Al Hikmah School"
+                required
+                value={form.name}
+              />
+            </Field>
+            <Field label="Tenant slug">
+              <Input
+                onChange={(event) => onUpdateForm('slug', event.target.value)}
+                placeholder="al-hikmah"
+                required
+                value={form.slug}
+              />
+            </Field>
+          </div>
+
+          <Field label="Description">
+            <Textarea
+              onChange={(event) => onUpdateForm('description', event.target.value)}
+              placeholder="Optional internal note about this school tenant"
+              value={form.description}
+            />
+          </Field>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Custom domain">
+              <Input
+                onChange={(event) => onUpdateForm('customDomain', event.target.value)}
+                placeholder="alhikmah.lessonhub.com"
+                value={form.customDomain}
+              />
+            </Field>
+            <Field label="First admin email">
+              <Input
+                onChange={(event) => onUpdateForm('firstAdminEmail', event.target.value)}
+                placeholder="admin@school.sch.id"
+                type="email"
+                value={form.firstAdminEmail}
+              />
+            </Field>
+          </div>
+
+          <Field label="Development admin password">
+            <Input
+              minLength={8}
+              onChange={(event) => onUpdateForm('firstAdminPassword', event.target.value)}
+              placeholder="Fill this to create the admin login now"
+              type="password"
+              value={form.firstAdminPassword}
+            />
+            <span className={`block text-xs leading-5 ${colors.app.muted}`}>
+              If email and password are filled, the system creates the admin user, accepts the invitation, creates the member row, and activates the tenant. Leave it blank for the future Resend invite flow.
+            </span>
+          </Field>
+
+          <DialogFooter>
+            <Button disabled={isCreating} type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button disabled={isCreating} type="submit">
+              {isCreating ? 'Creating...' : 'Create Tenant'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function Field({ children, label }: { children: React.ReactNode; label: string }) {
+  return (
+    <label className="block space-y-2">
+      <span className={`text-sm font-semibold ${colors.app.muted}`}>{label}</span>
+      {children}
+    </label>
+  )
+}
+
 function TenantStatus({ status }: { status: string }) {
   if (status === 'active') {
     return <Badge className={colors.success.badge}><CheckCircle2 className="h-3 w-3" /> Active</Badge>
@@ -226,4 +513,40 @@ function TenantStatus({ status }: { status: string }) {
   }
 
   return <Badge className={colors.warning.badge}><Settings2 className="h-3 w-3" /> Pending setup</Badge>
+}
+
+function formatUsage(tenant: PlatformTenant) {
+  if (tenant.pendingInvitationCount > 0 && tenant.memberCount === 0) {
+    return 'Awaiting admin'
+  }
+
+  if (tenant.memberCount === 1) {
+    return '1 member'
+  }
+
+  return `${tenant.memberCount} members`
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('en', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value))
+}
+
+function getSetupTask(tenant: PlatformTenant) {
+  if (tenant.status === 'suspended') return 'Review suspension status'
+  if (tenant.pendingInvitationCount > 0) return 'Waiting for first admin invitation acceptance'
+  if (tenant.status === 'pending_setup') return 'Invite first organization admin'
+
+  return 'Review tenant setup'
+}
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }

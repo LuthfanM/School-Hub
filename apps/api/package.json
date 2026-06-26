@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "tsc --noEmit",
-    "seed:platform-admin": "npm run build -w @schoolhub/database && tsx src/seed/platform-admin.ts"
+    "seed:platform-admin": "npm run build -w @schoolhub/database && tsx src/seed/platform-admin.ts",
+    "seed:platform-tenants": "npm run build -w @schoolhub/database && tsx src/seed/platform-tenants.ts"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.6.20",

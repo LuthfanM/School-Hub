@@ -15,7 +15,8 @@
     "db:studio": "cd packages/database && prisma studio",
     "db:migrate": "cd packages/database && prisma migrate dev",
     "db:reset": "cd packages/database && prisma migrate reset --force",
-    "seed:platform-admin": "npm run seed:platform-admin -w @schoolhub/api"
+    "seed:platform-admin": "npm run seed:platform-admin -w @schoolhub/api",
+    "seed:platform-tenants": "npm run seed:platform-tenants -w @schoolhub/api"
   },
   "devDependencies": {
     "turbo": "^1.12.0",

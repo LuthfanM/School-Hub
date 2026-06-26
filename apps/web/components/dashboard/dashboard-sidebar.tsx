@@ -15,7 +15,7 @@ export function DashboardSidebar() {
     : 'overview'
 
   return (
-    <aside className={`flex min-h-screen flex-col justify-between border-r p-4 ${dashboardColors.card}`}>
+    <aside className={`flex h-full flex-col justify-between border-r p-4 ${dashboardColors.card}`}>
       <div>
         <Link to="/" className="mb-8 flex items-center gap-3 px-2">
           <span className={`grid h-10 w-10 place-items-center rounded-2xl text-sm font-bold text-white ${colors.app.dark}`}>C</span>

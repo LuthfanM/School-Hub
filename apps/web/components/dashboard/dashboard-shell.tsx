@@ -57,12 +57,14 @@ export function DashboardShell({ initialPlatformRole }: DashboardShellProps) {
 
   return (
     <DashboardRoleContext.Provider value={{ role, setRole: setDemoRole }}>
-      <main className={`min-h-screen ${dashboardColors.page}`}>
-        <div className="grid lg:grid-cols-[280px_1fr]">
+      <main className={`h-screen overflow-hidden ${dashboardColors.page}`}>
+        <div className="grid h-full lg:grid-cols-[280px_minmax(0,1fr)]">
           <div className="hidden lg:block">
             <DashboardSidebar />
           </div>
-          {isOverview ? <DashboardOverview /> : <Outlet />}
+          <div className="h-full min-w-0 overflow-y-auto">
+            {isOverview ? <DashboardOverview /> : <Outlet />}
+          </div>
         </div>
       </main>
     </DashboardRoleContext.Provider>

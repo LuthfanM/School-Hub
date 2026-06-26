@@ -32,8 +32,8 @@ function DashboardSectionPage() {
   const isPlatformSettings = normalizedSection === 'platform-settings'
 
   return (
-    <main className={`min-h-screen p-4 sm:p-8 lg:col-start-2 ${dashboardColors.page}`}>
-      <div className="mx-auto max-w-6xl">
+    <main className={`min-h-full w-full p-4 sm:p-8 ${dashboardColors.page}`}>
+      <div className="w-full">
         <Link to="/dashboard" className={`mb-5 inline-flex items-center gap-2 text-sm font-semibold ${colors.app.muted} ${colors.app.foregroundHover}`}>
           <ArrowLeft className="h-4 w-4" />
           Back to overview
