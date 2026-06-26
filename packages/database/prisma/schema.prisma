@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,138 +8,167 @@ datasource db {
 }
 
 // ============================================================================
-// User Profile (connects to Supabase Auth)
+// Better Auth Core Tables
 // ============================================================================
-model Profile {
-  id            String    @id @default(cuid())
-  fullName      String?
-  avatarUrl     String?
+
+model User {
+  id            String    @id
+  name          String
   email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // Relations
-  organizationsCreated     Organization[]          @relation("createdByUser")
-  organizationMembers      OrganizationMember[]    @relation("memberUser")
-  invitationsSent          Invitation[]            @relation("invitedByUser")
-  invitationsReceived      Invitation[]            @relation("invitedUser")
-  coursesCreated           Course[]                @relation("createdByUser")
-  lessonsCreated           Lesson[]                @relation("createdByUser")
-  enrollmentsCreatedBy     CourseEnrollment[]      @relation("enrolledByUser")
-  courseEnrollments        CourseEnrollment[]      @relation("studentEnrollment")
-  lessonProgress           LessonProgress[]        @relation("studentProgress")
-  organizationMembershipsInvitedBy OrganizationMember[] @relation("invitedByMember")
+  sessions              Session[]
+  accounts              Account[]
+  organizationMembers   Member[]
+  organizationInvites   Invitation[]       @relation("inviterUser")
+  coursesCreated        Course[]           @relation("courseCreatedByUser")
+  lessonsCreated        Lesson[]           @relation("lessonCreatedByUser")
+  enrollmentsCreatedBy  CourseEnrollment[] @relation("enrolledByUser")
+  courseEnrollments     CourseEnrollment[] @relation("studentEnrollment")
+  lessonProgress        LessonProgress[]   @relation("studentProgress")
 
-  @@map("profiles")
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
 }
 
 // ============================================================================
-// Organization (Tenant)
+// Better Auth Organization Plugin Tables
 // ============================================================================
-model Organization {
-  id          String    @id @default(cuid())
-  name        String    @db.VarChar(255)
-  slug        String    @unique @db.VarChar(50)
-  description String?
-  logoUrl     String?
-  status      String    @default("active") // active, suspended, archived
-  customDomain String?  @unique
-  createdBy   String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
 
-  // Relations
-  createdByUser         Profile                @relation("createdByUser", fields: [createdBy], references: [id], onDelete: Cascade)
-  members               OrganizationMember[]   @relation("orgMembers")
-  invitations           Invitation[]           @relation("orgInvitations")
-  courses               Course[]               @relation("orgCourses")
-  lessons               Lesson[]               @relation("orgLessons")
-  courseEnrollments     CourseEnrollment[]     @relation("orgEnrollments")
-  lessonProgress        LessonProgress[]       @relation("orgProgress")
+model Organization {
+  id           String   @id
+  name         String
+  slug         String   @unique
+  logo         String?
+  metadata     String?
+  description  String?
+  status       String   @default("active")
+  customDomain String?  @unique
+  createdAt    DateTime @default(now())
+
+  members           Member[]
+  invitations       Invitation[]
+  courses           Course[]
+  lessons           Lesson[]
+  courseEnrollments CourseEnrollment[]
+  lessonProgress    LessonProgress[]
 
   @@index([slug])
   @@index([status])
-  @@map("organizations")
+  @@map("organization")
 }
 
-// ============================================================================
-// Organization Membership
-// ============================================================================
-model OrganizationMember {
-  id              String    @id @default(cuid())
-  organizationId  String
-  userId          String
-  role            String    // admin, teacher, student
-  status          String    @default("active") // active, removed, pending
-  invitedBy       String?
-  joinedAt        DateTime  @default(now())
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+model Member {
+  id             String   @id
+  organizationId String
+  userId         String
+  role           String
+  createdAt      DateTime @default(now())
 
-  // Relations
-  organization    Organization @relation("orgMembers", fields: [organizationId], references: [id], onDelete: Cascade)
-  user            Profile       @relation("memberUser", fields: [userId], references: [id], onDelete: Cascade)
-  invitedByUser   Profile?      @relation("invitedByMember", fields: [invitedBy], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, userId])
   @@index([organizationId])
   @@index([userId])
   @@index([role])
-  @@index([status])
-  @@map("organization_members")
+  @@map("member")
 }
 
-// ============================================================================
-// Invitation
-// ============================================================================
 model Invitation {
-  id              String    @id @default(cuid())
-  organizationId  String
-  email           String
-  role            String    // admin, teacher, student
-  tokenHash       String    @unique
-  status          String    @default("pending") // pending, accepted, revoked, expired
-  expiresAt       DateTime
-  acceptedAt      DateTime?
-  revokedAt       DateTime?
-  invitedBy       String
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String   @id
+  organizationId String
+  email          String
+  role           String
+  status         String   @default("pending")
+  expiresAt      DateTime
+  inviterId      String
+  teamId         String?
+  createdAt      DateTime @default(now())
 
-  // Relations
-  organization    Organization @relation("orgInvitations", fields: [organizationId], references: [id], onDelete: Cascade)
-  invitedByUser   Profile       @relation("invitedByUser", fields: [invitedBy], references: [id], onDelete: Cascade)
-  acceptedByUser  Profile?      @relation("invitedUser", fields: [email], references: [email])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter      User         @relation("inviterUser", fields: [inviterId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([email])
   @@index([status])
   @@index([expiresAt])
-  @@map("invitations")
+  @@map("invitation")
 }
 
 // ============================================================================
-// Course
+// SchoolHub LMS Domain Tables
 // ============================================================================
-model Course {
-  id              String    @id @default(cuid())
-  organizationId  String
-  title           String    @db.VarChar(255)
-  description     String?   @db.Text
-  thumbnailUrl    String?
-  status          String    @default("draft") // draft, published, archived
-  createdBy       String
-  publishedAt     DateTime?
-  archivedAt      DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
 
-  // Relations
-  organization    Organization         @relation("orgCourses", fields: [organizationId], references: [id], onDelete: Cascade)
-  createdByUser   Profile               @relation("createdByUser", fields: [createdBy], references: [id], onDelete: Cascade)
-  lessons         Lesson[]              @relation("courseLessons")
-  enrollments     CourseEnrollment[]    @relation("courseEnrollments")
-  lessonProgress  LessonProgress[]      @relation("courseProgress")
+model Course {
+  id             String    @id @default(cuid())
+  organizationId String
+  title          String    @db.VarChar(255)
+  description    String?   @db.Text
+  thumbnailUrl   String?
+  status         String    @default("draft") // draft, published, archived
+  createdBy      String
+  publishedAt    DateTime?
+  archivedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdByUser  User               @relation("courseCreatedByUser", fields: [createdBy], references: [id], onDelete: Cascade)
+  lessons        Lesson[]
+  enrollments    CourseEnrollment[]
+  lessonProgress LessonProgress[]
 
   @@index([organizationId])
   @@index([organizationId, status])
@@ -150,27 +176,23 @@ model Course {
   @@map("courses")
 }
 
-// ============================================================================
-// Lesson
-// ============================================================================
 model Lesson {
-  id              String    @id @default(cuid())
-  organizationId  String
-  courseId        String
-  title           String    @db.VarChar(255)
-  content         String?   @db.Text
-  videoUrl        String?
-  orderIndex      Int
-  status          String    @default("draft") // draft, published, archived
-  createdBy       String
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String   @id @default(cuid())
+  organizationId String
+  courseId       String
+  title          String   @db.VarChar(255)
+  content        String?  @db.Text
+  videoUrl       String?
+  orderIndex     Int
+  status         String   @default("draft") // draft, published, archived
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  // Relations
-  organization    Organization       @relation("orgLessons", fields: [organizationId], references: [id], onDelete: Cascade)
-  course          Course              @relation("courseLessons", fields: [courseId], references: [id], onDelete: Cascade)
-  createdByUser   Profile             @relation("createdByUser", fields: [createdBy], references: [id], onDelete: Cascade)
-  progress        LessonProgress[]    @relation("lessonProgress")
+  organization  Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  course        Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdByUser User             @relation("lessonCreatedByUser", fields: [createdBy], references: [id], onDelete: Cascade)
+  progress      LessonProgress[]
 
   @@unique([courseId, orderIndex])
   @@index([organizationId])
@@ -179,26 +201,22 @@ model Lesson {
   @@map("lessons")
 }
 
-// ============================================================================
-// Course Enrollment (Student enrollment in course)
-// ============================================================================
 model CourseEnrollment {
-  id              String    @id @default(cuid())
-  organizationId  String
-  courseId        String
-  studentId       String
-  enrolledBy      String
-  status          String    @default("active") // active, completed, removed
-  enrolledAt      DateTime  @default(now())
-  completedAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  organizationId String
+  courseId       String
+  studentId      String
+  enrolledBy     String?
+  status         String    @default("active") // active, completed, removed
+  enrolledAt     DateTime  @default(now())
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  // Relations
-  organization    Organization   @relation("orgEnrollments", fields: [organizationId], references: [id], onDelete: Cascade)
-  course          Course          @relation("courseEnrollments", fields: [courseId], references: [id], onDelete: Cascade)
-  student         Profile         @relation("studentEnrollment", fields: [studentId], references: [id], onDelete: Cascade)
-  enrolledByUser  Profile         @relation("enrolledByUser", fields: [enrolledBy], references: [id], onDelete: SetNull)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  course         Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student        User         @relation("studentEnrollment", fields: [studentId], references: [id], onDelete: Cascade)
+  enrolledByUser User?        @relation("enrolledByUser", fields: [enrolledBy], references: [id], onDelete: SetNull)
 
   @@unique([courseId, studentId])
   @@index([organizationId])
@@ -208,24 +226,20 @@ model CourseEnrollment {
   @@map("course_enrollments")
 }
 
-// ============================================================================
-// Lesson Progress (Student's lesson completion)
-// ============================================================================
 model LessonProgress {
-  id              String    @id @default(cuid())
-  organizationId  String
-  courseId        String
-  lessonId        String
-  studentId       String
-  completedAt     DateTime  @default(now())
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String   @id @default(cuid())
+  organizationId String
+  courseId       String
+  lessonId       String
+  studentId      String
+  completedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  // Relations
-  organization    Organization   @relation("orgProgress", fields: [organizationId], references: [id], onDelete: Cascade)
-  course          Course          @relation("courseProgress", fields: [courseId], references: [id], onDelete: Cascade)
-  lesson          Lesson          @relation("lessonProgress", fields: [lessonId], references: [id], onDelete: Cascade)
-  student         Profile         @relation("studentProgress", fields: [studentId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  course       Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lesson       Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  student      User         @relation("studentProgress", fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([lessonId, studentId])
   @@index([organizationId])

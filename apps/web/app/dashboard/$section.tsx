@@ -93,7 +93,7 @@ function DashboardSectionPage() {
                 <TabsContent value="empty" className="rounded-[24px] border border-dashed border-[#E5DED3] bg-white p-8 text-center">
                   <h2 className="text-xl font-bold">No live {title.toLowerCase()} data connected yet.</h2>
                   <p className="mx-auto mt-2 max-w-xl text-[#6F6A62]">
-                    This is ready for Supabase table data later. For now, use the buttons to confirm the screen flow.
+                    This is ready for API-backed data later. For now, use the buttons to confirm the screen flow.
                   </p>
                   <div className="mt-5 flex justify-center gap-3">
                     <Button asChild>

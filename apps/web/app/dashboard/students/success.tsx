@@ -14,7 +14,7 @@ function StudentSuccessPage() {
         <CardContent className="p-8">
         <CheckCircle2 className="mx-auto mb-5 h-14 w-14 text-[#16A34A]" />
         <h1 className="text-3xl font-bold">Student added successfully.</h1>
-        <p className="mt-3 text-[#6F6A62]">This is the dummy success state. Supabase saving can be added later when you are ready.</p>
+        <p className="mt-3 text-[#6F6A62]">This is the dummy success state. API saving can be added when the backend flow is ready.</p>
         <div className="mt-7 flex justify-center gap-3">
           <Button asChild>
             <Link to="/dashboard/$section" params={{ section: 'students' }}>View Students</Link>

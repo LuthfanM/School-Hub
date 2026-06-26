@@ -28,7 +28,7 @@ function DemoPage() {
             See how SchoolHub can organize attendance, classes, assignments, reports, and parent communication in one calm dashboard.
           </p>
           <div className="mt-8 space-y-4">
-            {['School admin dashboard walkthrough', 'Role-based teacher and student views', 'Supabase-ready data model discussion'].map((item) => (
+            {['School admin dashboard walkthrough', 'Role-based teacher and student views', 'PostgreSQL-backed data model discussion'].map((item) => (
               <div key={item} className="flex items-center gap-3">
                 <CheckCircle2 className="h-5 w-5 text-[#16A34A]" />
                 <span className="font-medium">{item}</span>
