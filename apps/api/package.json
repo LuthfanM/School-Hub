@@ -7,7 +7,8 @@
     "dev": "npm run build -w @schoolhub/database && tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "seed:platform-admin": "npm run build -w @schoolhub/database && tsx src/seed/platform-admin.ts"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.6.20",

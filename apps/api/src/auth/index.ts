@@ -15,6 +15,16 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  user: {
+    additionalFields: {
+      platformRole: {
+        type: 'string',
+        required: false,
+        defaultValue: 'user',
+        input: false,
+      },
+    },
+  },
   plugins: [
     organization({
       ac,

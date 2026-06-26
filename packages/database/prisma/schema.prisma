@@ -17,6 +17,7 @@ model User {
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
+  platformRole  String    @default("user") // user, platform_admin
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -27,8 +28,7 @@ model User {
   coursesCreated        Course[]           @relation("courseCreatedByUser")
   lessonsCreated        Lesson[]           @relation("lessonCreatedByUser")
   enrollmentsCreatedBy  CourseEnrollment[] @relation("enrolledByUser")
-  courseEnrollments     CourseEnrollment[] @relation("studentEnrollment")
-  lessonProgress        LessonProgress[]   @relation("studentProgress")
+  studentProfile        Student?
 
   @@map("user")
 }
@@ -99,6 +99,7 @@ model Organization {
 
   members           Member[]
   invitations       Invitation[]
+  students          Student[]
   courses           Course[]
   lessons           Lesson[]
   courseEnrollments CourseEnrollment[]
@@ -150,6 +151,30 @@ model Invitation {
 // ============================================================================
 // SchoolHub LMS Domain Tables
 // ============================================================================
+
+model Student {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String?  @unique
+  fullName       String   @db.VarChar(255)
+  nisn           String?  @db.VarChar(50)
+  email          String?
+  phone          String?
+  status         String   @default("active") // active, inactive, graduated, archived
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  enrollments  CourseEnrollment[]
+  progress     LessonProgress[]
+
+  @@unique([organizationId, nisn])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([status])
+  @@map("students")
+}
 
 model Course {
   id             String    @id @default(cuid())
@@ -215,7 +240,7 @@ model CourseEnrollment {
 
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   course         Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  student        User         @relation("studentEnrollment", fields: [studentId], references: [id], onDelete: Cascade)
+  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
   enrolledByUser User?        @relation("enrolledByUser", fields: [enrolledBy], references: [id], onDelete: SetNull)
 
   @@unique([courseId, studentId])
@@ -239,7 +264,7 @@ model LessonProgress {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   course       Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lesson       Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  student      User         @relation("studentProgress", fields: [studentId], references: [id], onDelete: Cascade)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([lessonId, studentId])
   @@index([organizationId])

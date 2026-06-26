@@ -1,0 +1,37 @@
+import { redirect } from '@tanstack/react-router'
+import { createServerFn } from '@tanstack/react-start'
+import { getRequestHeader } from '@tanstack/react-start/server'
+
+interface DashboardSessionUser {
+  id: string
+  name?: string | null
+  email: string
+  platformRole?: string | null
+}
+
+interface DashboardSession {
+  user: DashboardSessionUser
+}
+
+export const getDashboardSession = createServerFn({ method: 'GET' }).handler(async () => {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
+  const cookie = getRequestHeader('cookie')
+  const response = await fetch(`${apiBaseUrl}/api/session`, {
+    headers: cookie ? { cookie } : undefined,
+  })
+
+  if (!response.ok) {
+    throw redirect({ to: '/auth/login' })
+  }
+
+  const session = (await response.json()) as DashboardSession
+
+  return {
+    user: {
+      id: session.user.id,
+      name: session.user.name,
+      email: session.user.email,
+      platformRole: session.user.platformRole ?? 'user',
+    },
+  }
+})

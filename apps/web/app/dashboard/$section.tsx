@@ -6,19 +6,13 @@ import { Input } from '@schoolhub/ui/components/input'
 import { Skeleton } from '@schoolhub/ui/components/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@schoolhub/ui/components/tabs'
 import { ArrowLeft, CircleAlert, Filter, Plus, Search } from 'lucide-react'
-
-const titles: Record<string, string> = {
-  students: 'Students',
-  teachers: 'Teachers',
-  classes: 'Classes',
-  attendance: 'Attendance',
-  assignments: 'Assignments',
-  grades: 'Grades',
-  messages: 'Messages',
-  reports: 'Reports',
-  billing: 'Billing',
-  settings: 'Settings',
-}
+import {
+  canAccessScreen,
+  normalizeSection,
+  roles,
+  screens,
+} from '../../lib/role-access'
+import { useDashboardRole } from '../../lib/role-context'
 
 export const Route = createFileRoute('/dashboard/$section')({
   component: DashboardSectionPage,
@@ -26,36 +20,49 @@ export const Route = createFileRoute('/dashboard/$section')({
 
 function DashboardSectionPage() {
   const { section } = Route.useParams()
-  const title = titles[section] ?? 'Dashboard'
-  const isBilling = section === 'billing'
+  const { role } = useDashboardRole()
+  const normalizedSection = normalizeSection(section)
+  const screen = normalizedSection ? screens[normalizedSection] : null
+  const title = screen?.label ?? 'Unknown Section'
+  const isBilling = normalizedSection === 'billing'
+  const hasAccess = normalizedSection ? canAccessScreen(role, normalizedSection) : false
 
   return (
-    <main className="min-h-screen bg-[#F7F4EE] p-4 text-[#151515] sm:p-8">
+    <main className="min-h-screen bg-[#F7F4EE] p-4 text-[#151515] sm:p-8 lg:col-start-2">
       <div className="mx-auto max-w-6xl">
         <Link to="/dashboard" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[#6F6A62] hover:text-[#151515]">
           <ArrowLeft className="h-4 w-4" />
           Back to overview
         </Link>
+        {!hasAccess ? (
+          <RestrictedSection
+            roleLabel={roles[role].label}
+            sectionTitle={title}
+          />
+        ) : null}
+        {hasAccess ? (
         <Card className="rounded-[28px] border-[#E5DED3] bg-white">
           <CardContent className="p-6 sm:p-8">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#2563EB]">SchoolHub</p>
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#2563EB]">{roles[role].badge}</p>
               <h1 className="mt-2 text-4xl font-bold tracking-tight">{title}</h1>
               <p className="mt-3 max-w-2xl text-[#6F6A62]">
-                Dummy positive-flow screen for the {title.toLowerCase()} workspace. Actions are wired to valid paths so navigation can be tested before data integration.
+                {screen?.description ?? 'This route is not described yet.'}
               </p>
             </div>
             <div className="flex gap-2">
               <Button asChild variant="secondary">
                 <Link to="/dashboard/$section" params={{ section: 'reports' }}><Filter className="h-4 w-4" /> Filter</Link>
               </Button>
-              <Button asChild>
-                <Link to={section === 'students' ? '/dashboard/students/new' : '/demo'}>
+              {normalizedSection === 'students' || normalizedSection === 'classes' || normalizedSection === 'assignments' ? (
+                <Button asChild>
+                  <Link to={normalizedSection === 'students' ? '/dashboard/students/new' : '/demo'}>
                   <Plus className="h-4 w-4" />
                   Add {title.slice(0, -1) || title}
                 </Link>
-              </Button>
+                </Button>
+              ) : null}
             </div>
           </div>
 
@@ -117,7 +124,36 @@ function DashboardSectionPage() {
           )}
           </CardContent>
         </Card>
+        ) : null}
       </div>
     </main>
+  )
+}
+
+function RestrictedSection({
+  roleLabel,
+  sectionTitle,
+}: {
+  roleLabel: string
+  sectionTitle: string
+}) {
+  return (
+    <Card className="rounded-[28px] border-[#E5DED3] bg-white">
+      <CardContent className="p-8">
+        <CircleAlert className="mb-5 h-10 w-10 text-[#B45309]" />
+        <h1 className="text-3xl font-bold">Restricted screen</h1>
+        <p className="mt-3 max-w-2xl text-[#6F6A62]">
+          {roleLabel} cannot access {sectionTitle}. This screen is hidden by role policy until the user has the correct organization role or explicit platform support access.
+        </p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <Button asChild>
+            <Link to="/dashboard">Return to allowed overview</Link>
+          </Button>
+          <Button asChild variant="secondary">
+            <Link to="/demo">View demo flow</Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
