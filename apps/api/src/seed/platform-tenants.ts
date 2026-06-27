@@ -106,7 +106,7 @@ for (const tenantSeed of tenantSeeds) {
         id: `${organization.id}:${tenantSeed.adminEmail}`,
         organizationId: organization.id,
         email: tenantSeed.adminEmail,
-        role: 'admin',
+        role: 'owner',
         status: 'pending',
         expiresAt,
         inviterId: inviter.id,
@@ -144,10 +144,10 @@ for (const tenantSeed of tenantSeeds) {
         id: randomUUID(),
         organizationId: organization.id,
         userId: adminUser.id,
-        role: 'admin',
+        role: 'owner',
       },
       update: {
-        role: 'admin',
+        role: 'owner',
       },
     })
   }

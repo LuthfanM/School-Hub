@@ -28,7 +28,7 @@ export const auth = betterAuth({
   plugins: [
     organization({
       ac,
-      creatorRole: 'admin',
+      creatorRole: 'owner',
       roles: {
         owner,
         admin,
