@@ -12,6 +12,11 @@ function DashboardPage() {
   const loaderSession = Route.useLoaderData()
 
   return (
-    <DashboardShell initialPlatformRole={loaderSession.user.platformRole ?? 'user'} />
+    <DashboardShell
+      initialActiveOrganization={loaderSession.activeMembership?.organization ?? null}
+      initialActiveMembershipRole={loaderSession.activeMembership?.role ?? null}
+      initialActivePermissions={loaderSession.activeMembership?.permissions ?? []}
+      initialPlatformRole={loaderSession.user.platformRole ?? 'user'}
+    />
   )
 }

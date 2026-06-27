@@ -1,7 +1,22 @@
 import { createContext, useContext } from 'react'
 import type { RoleId } from './role-access'
 
+export interface ActiveOrganization {
+  id: string
+  name: string
+  slug: string
+  status: string
+}
+
+export interface ActivePermission {
+  resource: string
+  action: string
+}
+
 interface DashboardRoleContextValue {
+  activeOrganization: ActiveOrganization | null
+  activePermissions: ActivePermission[]
+  isSessionRole: boolean
   role: RoleId
   setRole: (role: RoleId) => void
 }

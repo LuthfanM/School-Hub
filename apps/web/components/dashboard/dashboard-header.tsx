@@ -29,7 +29,7 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ subtitle, title }: DashboardHeaderProps) {
-  const { role, setRole } = useDashboardRole()
+  const { isSessionRole, role, setRole } = useDashboardRole()
   const searchPlaceholder = role === 'platform_admin'
     ? 'Search tenants, admins'
     : role === 'student'
@@ -45,8 +45,10 @@ export function DashboardHeader({ subtitle, title }: DashboardHeaderProps) {
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <select
-          className={`h-11 rounded-full border px-4 text-sm font-semibold ${dashboardColors.panel} ${colors.app.foreground}`}
+          className={`h-11 rounded-full border px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70 ${dashboardColors.panel} ${colors.app.foreground}`}
+          disabled={isSessionRole}
           onChange={(event) => setRole(event.target.value as RoleId)}
+          title={isSessionRole ? 'Role is resolved from your session membership' : 'Local role preview'}
           value={role}
         >
           {Object.values(roles).map((roleOption) => (
@@ -59,7 +61,7 @@ export function DashboardHeader({ subtitle, title }: DashboardHeaderProps) {
           <Search className="h-4 w-4" />
           <Input className={`h-11 rounded-full pl-10 ${dashboardColors.panel}`} placeholder={searchPlaceholder} />
         </div>
-        {role === 'admin' || role === 'teacher' ? (
+        {role === 'owner' || role === 'admin' || role === 'teacher' ? (
           <Button asChild>
             <Link to="/dashboard/students/new">Add Student</Link>
           </Button>

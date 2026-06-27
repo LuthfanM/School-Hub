@@ -119,12 +119,28 @@ model Member {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions  MemberPermission[]
 
   @@unique([organizationId, userId])
   @@index([organizationId])
   @@index([userId])
   @@index([role])
   @@map("member")
+}
+
+model MemberPermission {
+  id        String   @id @default(cuid())
+  memberId  String
+  resource  String
+  action    String
+  createdAt DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, resource, action])
+  @@index([memberId])
+  @@index([resource, action])
+  @@map("member_permissions")
 }
 
 model Invitation {

@@ -8,16 +8,27 @@ import {
   roles,
   type RoleId,
 } from '../../lib/role-access'
-import { DashboardRoleContext } from '../../lib/role-context'
+import { DashboardRoleContext, type ActiveOrganization } from '../../lib/role-context'
 import { dashboardColors } from '../../styles/colors'
 import { DashboardOverview } from './dashboard-overview'
 import { DashboardSidebar } from './dashboard-sidebar'
 
 interface DashboardShellProps {
+  initialActiveOrganization: ActiveOrganization | null
+  initialActiveMembershipRole: string | null
+  initialActivePermissions: Array<{
+    resource: string
+    action: string
+  }>
   initialPlatformRole: string
 }
 
-export function DashboardShell({ initialPlatformRole }: DashboardShellProps) {
+export function DashboardShell({
+  initialActiveOrganization,
+  initialActiveMembershipRole,
+  initialActivePermissions,
+  initialPlatformRole,
+}: DashboardShellProps) {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const { data: session } = useSession()
@@ -29,7 +40,13 @@ export function DashboardShell({ initialPlatformRole }: DashboardShellProps) {
   })
   const sessionPlatformRole = (session?.user as { platformRole?: string } | undefined)?.platformRole
     ?? initialPlatformRole
-  const role: RoleId = sessionPlatformRole === 'platform_admin' ? 'platform_admin' : demoRole
+  const sessionOrgRole = isRoleId(initialActiveMembershipRole)
+    ? initialActiveMembershipRole
+    : null
+  const role: RoleId = sessionPlatformRole === 'platform_admin'
+    ? 'platform_admin'
+    : sessionOrgRole ?? demoRole
+  const isSessionRole = sessionPlatformRole === 'platform_admin' || Boolean(sessionOrgRole)
   const isOverview = pathname === '/dashboard'
 
   useEffect(() => {
@@ -40,7 +57,7 @@ export function DashboardShell({ initialPlatformRole }: DashboardShellProps) {
     if (pathname === '/dashboard') return
 
     const section = normalizeSection(pathname.split('/')[2])
-    if (!section || canAccessScreen(role, section)) return
+    if (!section || canAccessScreen(role, section, initialActivePermissions)) return
 
     const defaultSection = roles[role].defaultSection
 
@@ -53,10 +70,18 @@ export function DashboardShell({ initialPlatformRole }: DashboardShellProps) {
       to: '/dashboard/$section',
       params: { section: defaultSection },
     })
-  }, [navigate, pathname, role])
+  }, [initialActivePermissions, navigate, pathname, role])
 
   return (
-    <DashboardRoleContext.Provider value={{ role, setRole: setDemoRole }}>
+    <DashboardRoleContext.Provider
+      value={{
+        activeOrganization: initialActiveOrganization,
+        activePermissions: initialActivePermissions,
+        isSessionRole,
+        role,
+        setRole: setDemoRole,
+      }}
+    >
       <main className={`h-screen overflow-hidden ${dashboardColors.page}`}>
         <div className="grid h-full lg:grid-cols-[280px_minmax(0,1fr)]">
           <div className="hidden lg:block">
@@ -69,4 +94,8 @@ export function DashboardShell({ initialPlatformRole }: DashboardShellProps) {
       </main>
     </DashboardRoleContext.Provider>
   )
+}
+
+function isRoleId(value: string | null): value is RoleId {
+  return Boolean(value && value in roles)
 }

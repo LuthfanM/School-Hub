@@ -9,8 +9,25 @@ interface DashboardSessionUser {
   platformRole?: string | null
 }
 
+interface DashboardSessionMembership {
+  id: string
+  role: string
+  permissions?: Array<{
+    resource: string
+    action: string
+  }>
+  organization: {
+    id: string
+    name: string
+    slug: string
+    status: string
+  }
+}
+
 interface DashboardSession {
   user: DashboardSessionUser
+  memberships?: DashboardSessionMembership[]
+  activeMembership?: DashboardSessionMembership | null
 }
 
 export const getDashboardSession = createServerFn({ method: 'GET' }).handler(async () => {
@@ -33,5 +50,7 @@ export const getDashboardSession = createServerFn({ method: 'GET' }).handler(asy
       email: session.user.email,
       platformRole: session.user.platformRole ?? 'user',
     },
+    memberships: session.memberships ?? [],
+    activeMembership: session.activeMembership ?? null,
   }
 })

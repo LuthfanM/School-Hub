@@ -51,7 +51,7 @@ export function DashboardOverview() {
     <section className="p-4 sm:p-6 lg:p-8">
       <DashboardHeader
         subtitle="Manage daily school activity, attendance, and academic progress."
-        title={role === 'teacher' ? 'Good morning, Teacher' : 'Good morning, Admin'}
+        title={role === 'teacher' ? 'Good morning, Teacher' : role === 'owner' ? 'Good morning, Owner' : 'Good morning, Admin'}
       />
 
       {role === 'teacher' ? (

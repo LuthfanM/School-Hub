@@ -8,8 +8,8 @@ import { colors, dashboardColors } from '../../styles/colors'
 
 export function DashboardSidebar() {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
-  const { role } = useDashboardRole()
-  const navItems = getScreensForRole(role)
+  const { activePermissions, role } = useDashboardRole()
+  const navItems = getScreensForRole(role, activePermissions)
   const activeSection = pathname.startsWith('/dashboard/')
     ? pathname.split('/')[2]
     : 'overview'
