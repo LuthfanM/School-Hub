@@ -42,6 +42,11 @@ export const getDashboardSession = createServerFn({ method: 'GET' }).handler(asy
   }
 
   const session = (await response.json()) as DashboardSession
+  const isPlatformAdmin = session.user.platformRole === 'platform_admin'
+
+  if (!isPlatformAdmin && !session.activeMembership) {
+    throw redirect({ to: '/auth/login' })
+  }
 
   return {
     user: {

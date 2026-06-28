@@ -7,6 +7,28 @@ import { getPaginationMeta, type PaginationInput } from '../lib/pagination.js'
 
 export class DirectoryProvisioningError extends Error {}
 
+interface StudentRecord {
+  id: string
+  fullName: string
+  nisn: string | null
+  email: string | null
+  phone: string | null
+  status: string
+  createdAt: Date
+}
+
+interface TeacherRecord {
+  id: string
+  role: string
+  createdAt: Date
+  user: {
+    id: string
+    name: string
+    email: string
+    emailVerified: boolean
+  }
+}
+
 export async function listStudents({
   organizationId,
   pagination,
@@ -53,7 +75,7 @@ export async function listStudents({
   ])
 
   return {
-    data: students.map((student) => ({
+    data: students.map((student: StudentRecord) => ({
       ...student,
       createdAt: student.createdAt.toISOString(),
     })),
@@ -155,7 +177,7 @@ export async function listTeachers({
   ])
 
   return {
-    data: teachers.map((teacher) => ({
+    data: teachers.map((teacher: TeacherRecord) => ({
       id: teacher.id,
       role: teacher.role,
       createdAt: teacher.createdAt.toISOString(),

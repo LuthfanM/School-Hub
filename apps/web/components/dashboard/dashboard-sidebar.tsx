@@ -1,10 +1,11 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { Separator } from '@schoolhub/ui/components/separator'
-import { HelpCircle, LogOut } from 'lucide-react'
+import { HelpCircle } from 'lucide-react'
 
 import { getScreensForRole } from '../../lib/role-access'
 import { useDashboardRole } from '../../lib/role-context'
 import { colors, dashboardColors } from '../../styles/colors'
+import { DashboardLogoutButton } from './dashboard-logout-button'
 
 export function DashboardSidebar() {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
@@ -53,10 +54,7 @@ export function DashboardSidebar() {
           <HelpCircle className="h-4 w-4" />
           Help center
         </Link>
-        <Link to="/auth/login" className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium ${dashboardColors.inactiveNav}`}>
-          <LogOut className="h-4 w-4" />
-          Logout
-        </Link>
+        <DashboardLogoutButton />
       </div>
     </aside>
   )

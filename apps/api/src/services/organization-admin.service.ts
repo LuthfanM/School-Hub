@@ -88,7 +88,7 @@ export async function listOrganizationAdmins({
   ])
 
   return {
-    data: admins.map((admin) => serializeAdmin(admin)),
+    data: admins.map((admin: Parameters<typeof serializeAdmin>[0]) => serializeAdmin(admin)),
     pagination: getPaginationMeta(pagination.page, pagination.limit, total),
   }
 }

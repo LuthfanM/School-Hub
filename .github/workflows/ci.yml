@@ -37,5 +37,11 @@ jobs:
       - name: Run web type check
         run: npm run lint -w @schoolhub/web
 
-      - name: Run build
-        run: npm run build
+      - name: Build database package
+        run: npm run build -w @schoolhub/database
+
+      - name: Build API
+        run: npm run build -w @schoolhub/api
+
+      - name: Build web
+        run: npm run build -w @schoolhub/web

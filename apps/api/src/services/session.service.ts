@@ -1,5 +1,20 @@
 import { prisma } from '@schoolhub/database'
 
+interface SessionMembershipRecord {
+  id: string
+  role: string
+  permissions: Array<{
+    resource: string
+    action: string
+  }>
+  organization: {
+    id: string
+    name: string
+    slug: string
+    status: string
+  }
+}
+
 export async function getSessionPayload(userId: string) {
   const memberships = await prisma.member.findMany({
     where: { userId },
@@ -24,14 +39,16 @@ export async function getSessionPayload(userId: string) {
     },
   })
 
-  const serializedMemberships = memberships.map((membership) => ({
+  const serializedMemberships = memberships.map((membership: SessionMembershipRecord) => ({
     id: membership.id,
     role: membership.role,
     permissions: membership.permissions,
     organization: membership.organization,
   }))
 
-  const activeMembership = serializedMemberships.reduce<(typeof serializedMemberships)[number] | null>((current, membership) => {
+  const activeMembership = serializedMemberships
+    .filter((membership) => membership.organization.status === 'active')
+    .reduce<(typeof serializedMemberships)[number] | null>((current, membership) => {
     if (!current) return membership
 
     return getMembershipRolePriority(membership.role) < getMembershipRolePriority(current.role)
@@ -43,6 +60,74 @@ export async function getSessionPayload(userId: string) {
     memberships: serializedMemberships,
     activeMembership,
   }
+}
+
+export async function getLoginContext(email: string) {
+  const normalizedEmail = email.trim().toLowerCase()
+
+  const user = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    select: {
+      platformRole: true,
+      organizationMembers: {
+        select: {
+          organization: {
+            select: {
+              name: true,
+              status: true,
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (user) {
+    const hasActiveMembership = user.organizationMembers.some((membership) => {
+      return membership.organization.status === 'active'
+    })
+
+    if (user.platformRole === 'platform_admin' || hasActiveMembership) {
+      return { status: 'ok' as const }
+    }
+
+    const suspendedOrganization = user.organizationMembers.find((membership) => {
+      return membership.organization.status === 'suspended'
+    })?.organization
+
+    if (suspendedOrganization) {
+      return {
+        status: 'suspended' as const,
+        organizationName: suspendedOrganization.name,
+      }
+    }
+  }
+
+  const pendingInvitation = await prisma.invitation.findFirst({
+    where: {
+      email: normalizedEmail,
+      status: 'pending',
+      organization: {
+        status: 'pending_setup',
+      },
+    },
+    select: {
+      organization: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  })
+
+  if (pendingInvitation) {
+    return {
+      status: 'pending_setup' as const,
+      organizationName: pendingInvitation.organization.name,
+    }
+  }
+
+  return { status: 'unknown' as const }
 }
 
 function getMembershipRolePriority(role: string) {

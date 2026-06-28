@@ -12,6 +12,7 @@ out/
 build/
 dist/
 coverage/
+packages/database/src/generated/
 
 # Environment
 .env

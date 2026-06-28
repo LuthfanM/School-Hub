@@ -3,7 +3,8 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { Button } from '@schoolhub/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@schoolhub/ui/components/card'
 import { Input } from '@schoolhub/ui/components/input'
-import { authClient } from '../../lib/auth-client'
+import { apiRequest, getApiBaseUrl } from '../../lib/api'
+import { authClient, signOut } from '../../lib/auth-client'
 
 export const Route = createFileRoute('/auth/login')({
   component: LoginPage,
@@ -21,19 +22,44 @@ function LoginPage() {
     setError(null)
     setIsSubmitting(true)
 
-    const { error } = await authClient.signIn.email({
-      email,
-      password,
-      callbackURL: '/dashboard',
-    })
+    const blockedMessage = await getLoginContextMessage(email)
 
-    setIsSubmitting(false)
-
-    if (error) {
-      setError(error.message ?? 'Login failed')
+    if (blockedMessage) {
+      setError(blockedMessage)
+      setIsSubmitting(false)
       return
     }
 
+    const { error } = await authClient.signIn.email({
+      email,
+      password,
+    })
+
+    if (error) {
+      setError(error.message ?? 'Login failed')
+      setIsSubmitting(false)
+      return
+    }
+
+    const session = await apiRequest<{
+      user: {
+        platformRole?: string | null
+      }
+      activeMembership?: {
+        organization: {
+          status: string
+        }
+      } | null
+    }>('/api/session').catch(() => null)
+
+    if (!session?.activeMembership && session?.user.platformRole !== 'platform_admin') {
+      await signOut()
+      setError('No active organization workspace is available for this account.')
+      setIsSubmitting(false)
+      return
+    }
+
+    setIsSubmitting(false)
     await navigate({ to: '/dashboard' })
   }
 
@@ -75,4 +101,24 @@ function LoginPage() {
       </Card>
     </main>
   )
+}
+
+async function getLoginContextMessage(email: string) {
+  const params = new URLSearchParams({ email })
+  const response = await fetch(`${getApiBaseUrl()}/api/login-context?${params.toString()}`)
+    .then((result) => result.ok ? result.json() as Promise<{
+      status: 'ok' | 'pending_setup' | 'suspended' | 'unknown'
+      organizationName?: string
+    }> : null)
+    .catch(() => null)
+
+  if (response?.status === 'pending_setup') {
+    return `${response.organizationName ?? 'This school'} is still pending setup. The first owner must accept the invitation before this account can log in.`
+  }
+
+  if (response?.status === 'suspended') {
+    return `${response.organizationName ?? 'This school'} is suspended. Login is blocked until the platform admin reactivates the tenant.`
+  }
+
+  return null
 }

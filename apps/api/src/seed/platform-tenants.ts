@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto'
 
 import { prisma } from '@schoolhub/database'
 
+import { auth } from '../auth/index.js'
+
 type TenantSeed = {
   name: string
   slug: string
@@ -52,6 +54,20 @@ const tenantSeeds: TenantSeed[] = [
     adminName: 'Admin Cendekia',
   },
 ]
+
+const tenantOwnerPassword = process.env.SEED_TENANT_OWNER_PASSWORD
+
+if (!tenantOwnerPassword) {
+  console.error(
+    'Missing SEED_TENANT_OWNER_PASSWORD. Example: SEED_TENANT_OWNER_PASSWORD="SchoolHub123!" npm run seed:platform-tenants'
+  )
+  process.exit(1)
+}
+
+if (tenantOwnerPassword.length < 8) {
+  console.error('SEED_TENANT_OWNER_PASSWORD must be at least 8 characters.')
+  process.exit(1)
+}
 
 const inviter = await prisma.user.findFirst({
   where: {
@@ -118,15 +134,45 @@ for (const tenantSeed of tenantSeeds) {
       },
     })
   } else {
-    const adminUser = await prisma.user.upsert({
+    const existingUser = await prisma.user.findUnique({
       where: { email: tenantSeed.adminEmail },
-      create: {
-        id: randomUUID(),
-        name: tenantSeed.adminName,
-        email: tenantSeed.adminEmail,
-        emailVerified: true,
-      },
-      update: {
+      select: { id: true },
+    })
+
+    if (existingUser) {
+      const passwordAccount = await prisma.account.findFirst({
+        where: {
+          userId: existingUser.id,
+          providerId: 'credential',
+        },
+        select: { id: true },
+      })
+
+      if (!passwordAccount) {
+        await prisma.user.delete({
+          where: { id: existingUser.id },
+        })
+      }
+    }
+
+    const userWithPassword = await prisma.user.findUnique({
+      where: { email: tenantSeed.adminEmail },
+      select: { id: true },
+    })
+
+    if (!userWithPassword) {
+      await auth.api.signUpEmail({
+        body: {
+          name: tenantSeed.adminName,
+          email: tenantSeed.adminEmail,
+          password: tenantOwnerPassword,
+        },
+      })
+    }
+
+    const adminUser = await prisma.user.update({
+      where: { email: tenantSeed.adminEmail },
+      data: {
         name: tenantSeed.adminName,
         emailVerified: true,
       },

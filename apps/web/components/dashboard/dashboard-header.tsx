@@ -22,6 +22,7 @@ import { Bell, Search } from 'lucide-react'
 import { roles, type RoleId } from '../../lib/role-access'
 import { useDashboardRole } from '../../lib/role-context'
 import { colors, dashboardColors } from '../../styles/colors'
+import { DashboardLogoutButton } from './dashboard-logout-button'
 
 interface DashboardHeaderProps {
   subtitle: string
@@ -90,8 +91,8 @@ export function DashboardHeader({ subtitle, title }: DashboardHeaderProps) {
             <DropdownMenuItem asChild>
               <Link to="/dashboard/$section" params={{ section: role === 'platform_admin' ? 'platform-settings' : role === 'student' ? 'my-progress' : 'settings' }}>Settings</Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="/auth/login">Logout</Link>
+            <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
+              <DashboardLogoutButton className="w-full text-left text-sm" compact />
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
