@@ -78,6 +78,8 @@ export function DashboardShell({
         activeOrganization: initialActiveOrganization,
         activePermissions: initialActivePermissions,
         isSessionRole,
+        organizationRole: sessionOrgRole,
+        platformRole: sessionPlatformRole ?? 'user',
         role,
         setRole: setDemoRole,
       }}

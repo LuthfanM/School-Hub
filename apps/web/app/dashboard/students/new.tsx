@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { Button } from '@schoolhub/ui/components/button'
 import {
   Card,
@@ -17,9 +17,22 @@ import {
 } from '@schoolhub/ui/components/select'
 import { Textarea } from '@schoolhub/ui/components/textarea'
 import { ArrowLeft, Upload } from 'lucide-react'
+import { getDashboardSession } from '../../../lib/dashboard-session'
 import { colors, dashboardColors } from '../../../styles/colors'
 
 export const Route = createFileRoute('/dashboard/students/new')({
+  loader: async () => {
+    const session = await getDashboardSession()
+    const role = session.user.platformRole === 'platform_admin'
+      ? 'platform_admin'
+      : session.activeMembership?.role
+
+    if (role !== 'owner' && role !== 'admin') {
+      throw redirect({ to: '/dashboard' })
+    }
+
+    return session
+  },
   component: AddStudentPage,
 })
 

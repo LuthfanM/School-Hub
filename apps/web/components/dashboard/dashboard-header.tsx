@@ -61,7 +61,7 @@ export function DashboardHeader({ subtitle, title }: DashboardHeaderProps) {
           <Search className="h-4 w-4" />
           <Input className={`h-11 rounded-full pl-10 ${dashboardColors.panel}`} placeholder={searchPlaceholder} />
         </div>
-        {role === 'owner' || role === 'admin' || role === 'teacher' ? (
+        {role === 'owner' || role === 'admin' ? (
           <Button asChild>
             <Link to="/dashboard/students/new">Add Student</Link>
           </Button>

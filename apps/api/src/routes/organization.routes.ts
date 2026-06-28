@@ -8,8 +8,19 @@ import {
   listOrganizationAdmins,
   type AdminDashboardResource,
 } from '../services/organization-admin.service.js'
-import { listStudents, listTeachers } from '../services/organization-directory.service.js'
-import { canReadDashboardResource, getOrganizationMembership, hasRole } from '../services/membership.service.js'
+import {
+  DirectoryProvisioningError,
+  createStudent,
+  createTeacher,
+  listStudents,
+  listTeachers,
+} from '../services/organization-directory.service.js'
+import {
+  canManageDashboardResource,
+  canReadDashboardResource,
+  getOrganizationMembership,
+  hasRole,
+} from '../services/membership.service.js'
 import type { AppEnv } from '../types/app-env.js'
 
 export const organizationRoutes = new Hono<AppEnv>()
@@ -121,6 +132,53 @@ organizationRoutes.get('/:organizationId/students', async (c) => {
   return c.json(result)
 })
 
+organizationRoutes.post('/:organizationId/students', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.req.param('organizationId')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const membership = await getOrganizationMembership(user.id, organizationId)
+
+  if (!canManageDashboardResource(membership, 'students')) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  const body = await c.req.json().catch(() => null)
+  const fullName = typeof body?.fullName === 'string' ? body.fullName.trim() : ''
+  const nisn = typeof body?.nisn === 'string' && body.nisn.trim() ? body.nisn.trim() : null
+  const email = typeof body?.email === 'string' && body.email.trim() ? body.email.trim().toLowerCase() : null
+  const phone = typeof body?.phone === 'string' && body.phone.trim() ? body.phone.trim() : null
+
+  if (!fullName) {
+    return c.json({ error: 'Student full name is required.' }, 400)
+  }
+
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return c.json({ error: 'Student email is not valid.' }, 400)
+  }
+
+  try {
+    const student = await createStudent({
+      email,
+      fullName,
+      nisn,
+      organizationId,
+      phone,
+    })
+
+    return c.json({ student }, 201)
+  } catch (error) {
+    if (error instanceof DirectoryProvisioningError) {
+      return c.json({ error: error.message }, 400)
+    }
+
+    throw error
+  }
+})
+
 function parseAdminPermissions(value: unknown): AdminDashboardResource[] {
   if (!Array.isArray(value)) return []
 
@@ -150,4 +208,56 @@ organizationRoutes.get('/:organizationId/teachers', async (c) => {
   })
 
   return c.json(result)
+})
+
+organizationRoutes.post('/:organizationId/teachers', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.req.param('organizationId')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const membership = await getOrganizationMembership(user.id, organizationId)
+
+  if (!canManageDashboardResource(membership, 'teachers')) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  const body = await c.req.json().catch(() => null)
+  const name = typeof body?.name === 'string' ? body.name.trim() : ''
+  const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
+  const password =
+    typeof body?.password === 'string' && body.password.trim()
+      ? body.password
+      : null
+
+  if (!name) {
+    return c.json({ error: 'Teacher name is required.' }, 400)
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return c.json({ error: 'Teacher email is not valid.' }, 400)
+  }
+
+  if (password && password.length < 8) {
+    return c.json({ error: 'Teacher password must be at least 8 characters.' }, 400)
+  }
+
+  try {
+    const teacher = await createTeacher({
+      email,
+      name,
+      organizationId,
+      password,
+    })
+
+    return c.json({ teacher }, 201)
+  } catch (error) {
+    if (error instanceof DirectoryProvisioningError) {
+      return c.json({ error: error.message }, 400)
+    }
+
+    throw error
+  }
 })

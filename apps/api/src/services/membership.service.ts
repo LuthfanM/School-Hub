@@ -50,3 +50,28 @@ export function canReadDashboardResource(
     )
   })
 }
+
+export function canManageDashboardResource(
+  membership: {
+    role: string
+    permissions: Array<{
+      resource: string
+      action: string
+    }>
+  } | null,
+  resource: string
+) {
+  if (!membership) return false
+  if (membership.role === 'owner') return true
+  if (membership.role !== 'admin') return false
+
+  // Legacy admins without explicit rows keep existing role-based access.
+  if (membership.permissions.length === 0) return true
+
+  return membership.permissions.some((permission) => {
+    return (
+      (permission.resource === 'dashboard' && permission.action === 'access-all') ||
+      (permission.resource === `dashboard.${resource}` && permission.action === 'read')
+    )
+  })
+}

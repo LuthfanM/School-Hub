@@ -23,6 +23,7 @@ import {
 import { GraduationCap, Search, UserCog, Users, type LucideIcon } from 'lucide-react'
 
 import { apiRequest } from '../../lib/api'
+import { useDashboardRole } from '../../lib/role-context'
 import type { ActiveOrganization } from '../../lib/role-context'
 import { colors, dashboardColors } from '../../styles/colors'
 
@@ -58,6 +59,14 @@ interface TeacherRow {
     email: string
     emailVerified: boolean
   }
+}
+
+interface CreateStudentResponse {
+  student: StudentRow
+}
+
+interface CreateTeacherResponse {
+  teacher: TeacherRow
 }
 
 type DirectoryKind = 'students' | 'teachers'
@@ -498,6 +507,21 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
   const [page, setPage] = useState(1)
   const [isLoading, setIsLoading] = useState(Boolean(organization))
   const [error, setError] = useState<string | null>(null)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+  const [studentForm, setStudentForm] = useState({
+    fullName: '',
+    nisn: '',
+    email: '',
+    phone: '',
+  })
+  const [teacherForm, setTeacherForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+  })
+  const { role } = useDashboardRole()
+  const canCreate = role === 'owner' || role === 'admin'
   const endpoint = useMemo(() => {
     if (!organization) return null
 
@@ -545,6 +569,54 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
     setSearchQuery(searchInput.trim())
   }
 
+  async function submitCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!organization) return
+
+    setIsCreating(true)
+    setError(null)
+
+    try {
+      if (kind === 'students') {
+        const response = await apiRequest<CreateStudentResponse>(`/api/organizations/${organization.id}/students`, {
+          method: 'POST',
+          body: JSON.stringify({
+            fullName: studentForm.fullName,
+            nisn: studentForm.nisn || undefined,
+            email: studentForm.email || undefined,
+            phone: studentForm.phone || undefined,
+          }),
+        })
+
+        setRows((currentRows) => [response.student as unknown as T, ...currentRows])
+      } else {
+        const response = await apiRequest<CreateTeacherResponse>(`/api/organizations/${organization.id}/teachers`, {
+          method: 'POST',
+          body: JSON.stringify({
+            name: teacherForm.name,
+            email: teacherForm.email,
+            password: teacherForm.password || undefined,
+          }),
+        })
+
+        setRows((currentRows) => [response.teacher as unknown as T, ...currentRows])
+      }
+
+      setPagination((currentPagination) => ({
+        ...currentPagination,
+        total: currentPagination.total + 1,
+      }))
+      setStudentForm({ fullName: '', nisn: '', email: '', phone: '' })
+      setTeacherForm({ name: '', email: '', password: '' })
+      setIsCreateOpen(false)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : `Failed to create ${kind === 'students' ? 'student' : 'teacher'}.`)
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
   if (!organization) {
     return (
       <Card className={`rounded-[28px] ${dashboardColors.card}`}>
@@ -571,9 +643,16 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
               <h1 className="mt-2 text-4xl font-bold tracking-tight">{title}</h1>
               <p className={`mt-3 max-w-2xl ${colors.app.muted}`}>{description}</p>
             </div>
-            <div className={`rounded-2xl border px-4 py-3 text-sm ${dashboardColors.panel}`}>
-              <span className={colors.app.muted}>Total</span>
-              <span className="ml-3 font-mono text-lg font-bold">{pagination.total}</span>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className={`rounded-2xl border px-4 py-3 text-sm ${dashboardColors.panel}`}>
+                <span className={colors.app.muted}>Total</span>
+                <span className="ml-3 font-mono text-lg font-bold">{pagination.total}</span>
+              </div>
+              {canCreate ? (
+                <Button type="button" onClick={() => setIsCreateOpen(true)}>
+                  {kind === 'students' ? 'Add Student' : 'Add Teacher'}
+                </Button>
+              ) : null}
             </div>
           </div>
 
@@ -661,6 +740,65 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{kind === 'students' ? 'Add student' : 'Add teacher'}</DialogTitle>
+            <DialogDescription>
+              {kind === 'students'
+                ? 'Create an academic student record for this organization.'
+                : 'Create a teacher member for this organization. Later this should become a Resend invitation flow.'}
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-5" onSubmit={submitCreate}>
+            {kind === 'students' ? (
+              <>
+                <Field label="Full name">
+                  <Input required value={studentForm.fullName} onChange={(event) => setStudentForm((currentForm) => ({ ...currentForm, fullName: event.target.value }))} />
+                </Field>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="NISN">
+                    <Input value={studentForm.nisn} onChange={(event) => setStudentForm((currentForm) => ({ ...currentForm, nisn: event.target.value }))} />
+                  </Field>
+                  <Field label="Email">
+                    <Input type="email" value={studentForm.email} onChange={(event) => setStudentForm((currentForm) => ({ ...currentForm, email: event.target.value }))} />
+                  </Field>
+                </div>
+                <Field label="Phone">
+                  <Input value={studentForm.phone} onChange={(event) => setStudentForm((currentForm) => ({ ...currentForm, phone: event.target.value }))} />
+                </Field>
+              </>
+            ) : (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Name">
+                    <Input required value={teacherForm.name} onChange={(event) => setTeacherForm((currentForm) => ({ ...currentForm, name: event.target.value }))} />
+                  </Field>
+                  <Field label="Email">
+                    <Input required type="email" value={teacherForm.email} onChange={(event) => setTeacherForm((currentForm) => ({ ...currentForm, email: event.target.value }))} />
+                  </Field>
+                </div>
+                <Field label="Development password">
+                  <Input minLength={8} type="password" value={teacherForm.password} onChange={(event) => setTeacherForm((currentForm) => ({ ...currentForm, password: event.target.value }))} />
+                  <span className={`block text-xs leading-5 ${colors.app.muted}`}>
+                    Required when this email does not already exist. Existing users can be added without a password.
+                  </span>
+                </Field>
+              </>
+            )}
+
+            <DialogFooter>
+              <Button disabled={isCreating} type="button" variant="secondary" onClick={() => setIsCreateOpen(false)}>
+                Cancel
+              </Button>
+              <Button disabled={isCreating} type="submit">
+                {isCreating ? 'Creating...' : kind === 'students' ? 'Create Student' : 'Create Teacher'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

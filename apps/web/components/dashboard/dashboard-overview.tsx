@@ -53,6 +53,7 @@ export function DashboardOverview() {
         subtitle="Manage daily school activity, attendance, and academic progress."
         title={role === 'teacher' ? 'Good morning, Teacher' : role === 'owner' ? 'Good morning, Owner' : 'Good morning, Admin'}
       />
+      <SessionRoleSummary />
 
       {role === 'teacher' ? (
         <RoleNotice
@@ -223,6 +224,7 @@ function PlatformOverview() {
         subtitle="Monitor platform operations, tenant onboarding, support setup, and global SaaS health."
         title="Platform Summary"
       />
+      <SessionRoleSummary />
       <RoleNotice
         blocked="Student records, grades, course content, and tenant-private progress unless explicit support access is granted later."
         title="Global admin boundary"
@@ -343,6 +345,41 @@ function PlatformOverview() {
   )
 }
 
+function SessionRoleSummary() {
+  const {
+    activeOrganization,
+    isSessionRole,
+    organizationRole,
+    platformRole,
+    role,
+  } = useDashboardRole()
+
+  return (
+    <Card className={`mb-6 rounded-[20px] ${dashboardColors.card}`}>
+      <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-sm font-semibold">Session role</p>
+          <p className={`text-sm ${colors.app.muted}`}>
+            {activeOrganization ? activeOrganization.name : 'No active organization'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge className={colors.brand.badge}>dashboard: {role}</Badge>
+          <Badge className={platformRole === 'platform_admin' ? colors.success.badge : colors.warning.badge}>
+            platformRole: {platformRole}
+          </Badge>
+          <Badge className={organizationRole ? colors.brand.badge : colors.warning.badge}>
+            organizationRole: {organizationRole ?? 'none'}
+          </Badge>
+          <Badge className={isSessionRole ? colors.success.badge : colors.warning.badge}>
+            source: {isSessionRole ? 'session' : 'local preview'}
+          </Badge>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function StudentOverview() {
   return (
     <section className="p-4 sm:p-6 lg:p-8">
@@ -350,6 +387,7 @@ function StudentOverview() {
         subtitle="Access assigned courses, open lessons, and track your own progress."
         title="My learning"
       />
+      <SessionRoleSummary />
       <RoleNotice
         blocked="Other students, teacher tools, admin dashboards, billing, organization settings, and course authoring."
         title="Student workspace"

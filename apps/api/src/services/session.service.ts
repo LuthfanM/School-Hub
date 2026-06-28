@@ -31,8 +31,25 @@ export async function getSessionPayload(userId: string) {
     organization: membership.organization,
   }))
 
+  const activeMembership = serializedMemberships.reduce<(typeof serializedMemberships)[number] | null>((current, membership) => {
+    if (!current) return membership
+
+    return getMembershipRolePriority(membership.role) < getMembershipRolePriority(current.role)
+      ? membership
+      : current
+  }, null)
+
   return {
     memberships: serializedMemberships,
-    activeMembership: serializedMemberships[0] ?? null,
+    activeMembership,
   }
+}
+
+function getMembershipRolePriority(role: string) {
+  if (role === 'owner') return 0
+  if (role === 'admin') return 1
+  if (role === 'teacher') return 2
+  if (role === 'student') return 3
+
+  return 4
 }

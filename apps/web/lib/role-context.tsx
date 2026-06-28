@@ -17,6 +17,8 @@ interface DashboardRoleContextValue {
   activeOrganization: ActiveOrganization | null
   activePermissions: ActivePermission[]
   isSessionRole: boolean
+  organizationRole: RoleId | null
+  platformRole: string
   role: RoleId
   setRole: (role: RoleId) => void
 }

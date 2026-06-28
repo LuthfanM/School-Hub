@@ -39,8 +39,8 @@ export const teacher = ac.newRole({
   ...memberAc.statements,
   course: ['create', 'read', 'update', 'delete', 'publish'],
   lesson: ['create', 'read', 'update', 'delete', 'publish'],
-  student: ['create', 'read', 'read-own', 'update', 'link-user'],
-  enrollment: ['create', 'read', 'update'],
+  student: ['read', 'read-own'],
+  enrollment: ['read'],
   progress: ['read', 'read-own', 'create', 'update'],
 })
 
