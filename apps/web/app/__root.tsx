@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-router'
 import { Button } from '@schoolhub/ui/components/button'
 import appCss from './globals.css?url'
+import '../lib/i18n'
 
 export const Route = createRootRoute({
   head: () => ({

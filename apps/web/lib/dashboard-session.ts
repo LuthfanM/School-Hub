@@ -7,6 +7,7 @@ interface DashboardSessionUser {
   name?: string | null
   email: string
   platformRole?: string | null
+  language?: string | null
 }
 
 interface DashboardSessionMembership {
@@ -26,6 +27,9 @@ interface DashboardSessionMembership {
 
 interface DashboardSession {
   user: DashboardSessionUser
+  preferences?: {
+    language?: string | null
+  }
   memberships?: DashboardSessionMembership[]
   activeMembership?: DashboardSessionMembership | null
 }
@@ -54,6 +58,10 @@ export const getDashboardSession = createServerFn({ method: 'GET' }).handler(asy
       name: session.user.name,
       email: session.user.email,
       platformRole: session.user.platformRole ?? 'user',
+      language: session.preferences?.language ?? session.user.language ?? 'en',
+    },
+    preferences: {
+      language: session.preferences?.language ?? session.user.language ?? 'en',
     },
     memberships: session.memberships ?? [],
     activeMembership: session.activeMembership ?? null,

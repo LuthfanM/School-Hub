@@ -1,12 +1,22 @@
 import { useState } from 'react'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { Button } from '@schoolhub/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@schoolhub/ui/components/card'
 import { Input } from '@schoolhub/ui/components/input'
 import { apiRequest, getApiBaseUrl } from '../../lib/api'
+import { getAuthRedirectTarget } from '../../lib/auth-redirect'
 import { authClient, signOut } from '../../lib/auth-client'
 
 export const Route = createFileRoute('/auth/login')({
+  loader: async () => {
+    const redirectTarget = await getAuthRedirectTarget()
+
+    if (redirectTarget === '/dashboard') {
+      throw redirect({ to: '/dashboard' })
+    }
+
+    return null
+  },
   component: LoginPage,
 })
 

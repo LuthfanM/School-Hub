@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Badge } from '@schoolhub/ui/components/badge'
 import { Button } from '@schoolhub/ui/components/button'
 import { Card, CardContent } from '@schoolhub/ui/components/card'
@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@schoolhub/ui/components/table'
-import { GraduationCap, Search, UserCog, Users, type LucideIcon } from 'lucide-react'
+import { ChevronDown, ChevronRight, GraduationCap, Search, Trash2, UserCog, Users, type LucideIcon } from 'lucide-react'
 
 import { apiRequest } from '../../lib/api'
 import { useDashboardRole } from '../../lib/role-context'
@@ -90,7 +90,7 @@ interface AdminRow {
   id: string
   role: string
   accessMode: 'all' | 'custom'
-  permissions: string[]
+  permissions: AdminPermission[]
   createdAt: string
   user: {
     id: string
@@ -104,10 +104,19 @@ interface CreateAdminResponse {
   admin: AdminRow
 }
 
+interface UpdateAdminResponse {
+  admin: AdminRow
+}
+
 interface AdminForm {
   name: string
   email: string
   password: string
+  accessMode: 'all' | 'custom'
+  permissions: AdminPermission[]
+}
+
+interface AdminPermissionDraft {
   accessMode: 'all' | 'custom'
   permissions: AdminPermission[]
 }
@@ -139,6 +148,13 @@ export function OrganizationAdminsScreen({
   const [error, setError] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [isCreateBlocked, setIsCreateBlocked] = useState(false)
+  const [adminPendingDeletion, setAdminPendingDeletion] = useState<AdminRow | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [expandedAdminId, setExpandedAdminId] = useState<string | null>(null)
+  const [permissionDrafts, setPermissionDrafts] = useState<Record<string, AdminPermissionDraft>>({})
+  const [savingAdminId, setSavingAdminId] = useState<string | null>(null)
   const [form, setForm] = useState<AdminForm>(emptyAdminForm)
   const endpoint = useMemo(() => {
     if (!organization) return null
@@ -184,10 +200,10 @@ export function OrganizationAdminsScreen({
   async function createAdmin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!organization) return
+    if (!organization || isCreateBlocked) return
 
     setIsCreating(true)
-    setError(null)
+    setCreateError(null)
 
     try {
       const response = await apiRequest<CreateAdminResponse>(`/api/organizations/${organization.id}/admins`, {
@@ -207,11 +223,48 @@ export function OrganizationAdminsScreen({
         total: currentPagination.total + 1,
       }))
       setForm(emptyAdminForm)
-      setIsCreateOpen(false)
+      closeCreateDialog()
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Failed to create admin.')
+      setCreateError(requestError instanceof Error ? requestError.message : 'Failed to create admin.')
+      setIsCreateBlocked(true)
     } finally {
       setIsCreating(false)
+    }
+  }
+
+  function closeCreateDialog() {
+    setIsCreateOpen(false)
+    setCreateError(null)
+    setIsCreateBlocked(false)
+  }
+
+  function updateCreateForm(updater: (currentForm: AdminForm) => AdminForm) {
+    setForm(updater)
+    setCreateError(null)
+    setIsCreateBlocked(false)
+  }
+
+  async function deleteAdmin() {
+    if (!organization || !adminPendingDeletion) return
+
+    setIsDeleting(true)
+    setError(null)
+
+    try {
+      await apiRequest<{ success: boolean }>(`/api/organizations/${organization.id}/admins/${adminPendingDeletion.id}`, {
+        method: 'DELETE',
+      })
+
+      setAdmins((currentAdmins) => currentAdmins.filter((admin) => admin.id !== adminPendingDeletion.id))
+      setPagination((currentPagination) => ({
+        ...currentPagination,
+        total: Math.max(currentPagination.total - 1, 0),
+      }))
+      setAdminPendingDeletion(null)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Failed to delete admin.')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -222,12 +275,82 @@ export function OrganizationAdminsScreen({
   }
 
   function updatePermission(permission: AdminPermission, isChecked: boolean) {
-    setForm((currentForm) => ({
+    updateCreateForm((currentForm) => ({
       ...currentForm,
       permissions: isChecked
         ? [...new Set([...currentForm.permissions, permission])]
         : currentForm.permissions.filter((currentPermission) => currentPermission !== permission),
     }))
+  }
+
+  function toggleAdminPermissions(admin: AdminRow) {
+    setExpandedAdminId((currentAdminId) => {
+      if (currentAdminId === admin.id) return null
+
+      setPermissionDrafts((currentDrafts) => ({
+        ...currentDrafts,
+        [admin.id]: currentDrafts[admin.id] ?? getAdminPermissionDraft(admin),
+      }))
+
+      return admin.id
+    })
+  }
+
+  function updateAdminAccessMode(adminId: string, accessMode: 'all' | 'custom') {
+    setPermissionDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [adminId]: {
+        ...(currentDrafts[adminId] ?? { accessMode, permissions: ['students', 'teachers'] }),
+        accessMode,
+      },
+    }))
+  }
+
+  function updateAdminPermission(adminId: string, permission: AdminPermission, isChecked: boolean) {
+    setPermissionDrafts((currentDrafts) => {
+      const currentDraft = currentDrafts[adminId] ?? { accessMode: 'custom', permissions: [] }
+
+      return {
+        ...currentDrafts,
+        [adminId]: {
+          ...currentDraft,
+          permissions: isChecked
+            ? [...new Set([...currentDraft.permissions, permission])]
+            : currentDraft.permissions.filter((currentPermission) => currentPermission !== permission),
+        },
+      }
+    })
+  }
+
+  async function saveAdminPermissions(admin: AdminRow) {
+    if (!organization) return
+
+    const draft = permissionDrafts[admin.id] ?? getAdminPermissionDraft(admin)
+
+    setSavingAdminId(admin.id)
+    setError(null)
+
+    try {
+      const response = await apiRequest<UpdateAdminResponse>(`/api/organizations/${organization.id}/admins/${admin.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          accessMode: draft.accessMode,
+          permissions: draft.accessMode === 'all' ? [] : draft.permissions,
+        }),
+      })
+
+      setAdmins((currentAdmins) => currentAdmins.map((currentAdmin) => {
+        return currentAdmin.id === response.admin.id ? response.admin : currentAdmin
+      }))
+      setPermissionDrafts((currentDrafts) => ({
+        ...currentDrafts,
+        [response.admin.id]: getAdminPermissionDraft(response.admin),
+      }))
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Failed to save admin permissions.')
+    } finally {
+      setSavingAdminId(null)
+    }
   }
 
   if (!organization) {
@@ -274,7 +397,7 @@ export function OrganizationAdminsScreen({
             <Table>
               <TableHeader className={dashboardColors.tableHeader}>
                 <TableRow>
-                  {['Admin', 'Email', 'Access', 'Permissions', 'Joined'].map((column) => (
+                  {['Admin', 'Email', 'Access', 'Permissions', 'Joined', ''].map((column) => (
                     <TableHead key={column} className="whitespace-nowrap font-semibold">{column}</TableHead>
                   ))}
                 </TableRow>
@@ -282,35 +405,114 @@ export function OrganizationAdminsScreen({
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell className={`h-28 text-center ${colors.app.muted}`} colSpan={5}>
+                    <TableCell className={`h-28 text-center ${colors.app.muted}`} colSpan={6}>
                       Loading admins...
                     </TableCell>
                   </TableRow>
                 ) : null}
                 {!isLoading && admins.length === 0 ? (
                   <TableRow>
-                    <TableCell className="h-36 text-center" colSpan={5}>
+                    <TableCell className="h-36 text-center" colSpan={6}>
                       <UserCog className={`mx-auto mb-3 h-8 w-8 ${colors.app.muted}`} />
                       <p className="font-semibold">No admins found for this organization.</p>
                     </TableCell>
                   </TableRow>
                 ) : null}
                 {!isLoading
-                  ? admins.map((admin) => (
-                    <TableRow key={admin.id} className={`${colors.app.border} ${colors.app.backgroundHover}`}>
-                      <TableCell className="whitespace-nowrap font-semibold">{admin.user.name}</TableCell>
-                      <TableCell className={`whitespace-nowrap ${colors.app.muted}`}>{admin.user.email}</TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <Badge className={admin.accessMode === 'all' ? colors.success.badge : colors.warning.badge}>
-                          {admin.accessMode === 'all' ? 'All access' : 'Custom'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className={colors.app.muted}>
-                        {admin.accessMode === 'all' ? 'Every organization menu' : formatPermissionLabels(admin.permissions)}
-                      </TableCell>
-                      <TableCell className={`whitespace-nowrap ${colors.app.muted}`}>{formatDate(admin.createdAt)}</TableCell>
-                    </TableRow>
-                  ))
+                  ? admins.map((admin) => {
+                    const isExpanded = expandedAdminId === admin.id
+                    const draft = permissionDrafts[admin.id] ?? getAdminPermissionDraft(admin)
+
+                    return (
+                      <Fragment key={admin.id}>
+                        <TableRow className={`${colors.app.border} ${colors.app.backgroundHover}`}>
+                          <TableCell className="whitespace-nowrap font-semibold">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${admin.user.name} permissions`}
+                                className="h-8 w-8"
+                                onClick={() => toggleAdminPermissions(admin)}
+                                size="icon"
+                                title={`${isExpanded ? 'Collapse' : 'Expand'} permissions`}
+                                type="button"
+                                variant="ghost"
+                              >
+                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              </Button>
+                              <span>{admin.user.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className={`whitespace-nowrap ${colors.app.muted}`}>{admin.user.email}</TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <Badge className={admin.accessMode === 'all' ? colors.success.badge : colors.warning.badge}>
+                              {admin.accessMode === 'all' ? 'All access' : 'Custom'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className={colors.app.muted}>
+                            {admin.accessMode === 'all' ? 'Every organization menu' : formatPermissionLabels(admin.permissions)}
+                          </TableCell>
+                          <TableCell className={`whitespace-nowrap ${colors.app.muted}`}>{formatDate(admin.createdAt)}</TableCell>
+                          <TableCell className="w-12 text-right">
+                            <Button
+                              aria-label={`Delete ${admin.user.name}`}
+                              className="h-9 w-9"
+                              onClick={() => setAdminPendingDeletion(admin)}
+                              size="icon"
+                              title={`Delete ${admin.user.name}`}
+                              type="button"
+                              variant="destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded ? (
+                          <TableRow className={colors.app.border}>
+                            <TableCell colSpan={6}>
+                              <div className={`rounded-2xl border p-4 ${dashboardColors.panel}`}>
+                                <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+                                  <div>
+                                    <p className="font-semibold">Dashboard permissions</p>
+                                    <p className={`mt-1 text-sm ${colors.app.muted}`}>
+                                      Select the dashboard sections this admin can open.
+                                    </p>
+                                  </div>
+                                  <Button disabled={savingAdminId === admin.id} type="button" onClick={() => saveAdminPermissions(admin)}>
+                                    {savingAdminId === admin.id ? 'Saving...' : 'Save'}
+                                  </Button>
+                                </div>
+
+                                <label className="mt-4 flex items-start gap-3">
+                                  <Checkbox
+                                    checked={draft.accessMode === 'all'}
+                                    onCheckedChange={(checked) => updateAdminAccessMode(admin.id, checked ? 'all' : 'custom')}
+                                  />
+                                  <span>
+                                    <span className="block font-semibold">Can view all organization menus</span>
+                                    <span className={`block text-sm ${colors.app.muted}`}>Uncheck to manage individual permissions.</span>
+                                  </span>
+                                </label>
+
+                                {draft.accessMode === 'custom' ? (
+                                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                    {adminPermissionOptions.map(([permission, label]) => (
+                                      <label key={permission} className={`flex items-center gap-3 rounded-2xl border p-3 ${colors.app.card} ${colors.app.border}`}>
+                                        <Checkbox
+                                          checked={draft.permissions.includes(permission)}
+                                          onCheckedChange={(checked) => updateAdminPermission(admin.id, permission, Boolean(checked))}
+                                        />
+                                        <span className="text-sm font-semibold">{label}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : null}
+                      </Fragment>
+                    )
+                  })
                   : null}
               </TableBody>
             </Table>
@@ -332,7 +534,14 @@ export function OrganizationAdminsScreen({
         </CardContent>
       </Card>
 
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+      <Dialog open={isCreateOpen} onOpenChange={(isOpen) => {
+        if (isOpen) {
+          setIsCreateOpen(true)
+          return
+        }
+
+        closeCreateDialog()
+      }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add admin</DialogTitle>
@@ -343,14 +552,14 @@ export function OrganizationAdminsScreen({
           <form className="space-y-5" onSubmit={createAdmin}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Name">
-                <Input required value={form.name} onChange={(event) => setForm((currentForm) => ({ ...currentForm, name: event.target.value }))} />
+                <Input required value={form.name} onChange={(event) => updateCreateForm((currentForm) => ({ ...currentForm, name: event.target.value }))} />
               </Field>
               <Field label="Email">
-                <Input required type="email" value={form.email} onChange={(event) => setForm((currentForm) => ({ ...currentForm, email: event.target.value }))} />
+                <Input required type="email" value={form.email} onChange={(event) => updateCreateForm((currentForm) => ({ ...currentForm, email: event.target.value }))} />
               </Field>
             </div>
             <Field label="Development password">
-              <Input minLength={8} type="password" value={form.password} onChange={(event) => setForm((currentForm) => ({ ...currentForm, password: event.target.value }))} />
+              <Input minLength={8} type="password" value={form.password} onChange={(event) => updateCreateForm((currentForm) => ({ ...currentForm, password: event.target.value }))} />
               <span className={`block text-xs leading-5 ${colors.app.muted}`}>
                 Required when this email does not already exist. Later this should become a Resend invitation flow.
               </span>
@@ -360,7 +569,7 @@ export function OrganizationAdminsScreen({
               <label className="flex items-start gap-3">
                 <Checkbox
                   checked={form.accessMode === 'all'}
-                  onCheckedChange={(checked) => setForm((currentForm) => ({ ...currentForm, accessMode: checked ? 'all' : 'custom' }))}
+                  onCheckedChange={(checked) => updateCreateForm((currentForm) => ({ ...currentForm, accessMode: checked ? 'all' : 'custom' }))}
                 />
                 <span>
                   <span className="block font-semibold">Can view all organization menus</span>
@@ -383,15 +592,44 @@ export function OrganizationAdminsScreen({
               </div>
             ) : null}
 
+            {createError ? (
+              <div className={`rounded-2xl border p-4 text-sm ${colors.danger.subtleBg} ${colors.app.border}`}>
+                {createError}
+              </div>
+            ) : null}
+
             <DialogFooter>
-              <Button disabled={isCreating} type="button" variant="secondary" onClick={() => setIsCreateOpen(false)}>
+              <Button disabled={isCreating} type="button" variant="secondary" onClick={closeCreateDialog}>
                 Cancel
               </Button>
-              <Button disabled={isCreating} type="submit">
+              <Button disabled={isCreating || isCreateBlocked} type="submit">
                 {isCreating ? 'Creating...' : 'Create Admin'}
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(adminPendingDeletion)} onOpenChange={(isOpen) => {
+        if (!isOpen && !isDeleting) setAdminPendingDeletion(null)
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete admin</DialogTitle>
+            <DialogDescription>
+              {adminPendingDeletion
+                ? `Remove ${adminPendingDeletion.user.name} from this organization. Their admin permissions will be deleted too.`
+                : 'Remove this admin from the organization.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button disabled={isDeleting} type="button" variant="secondary" onClick={() => setAdminPendingDeletion(null)}>
+              Cancel
+            </Button>
+            <Button disabled={isDeleting} type="button" variant="destructive" onClick={deleteAdmin}>
+              {isDeleting ? 'Deleting...' : 'Delete Admin'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -509,6 +747,8 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
   const [error, setError] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [isCreateBlocked, setIsCreateBlocked] = useState(false)
   const [studentForm, setStudentForm] = useState({
     fullName: '',
     nisn: '',
@@ -572,10 +812,10 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
   async function submitCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!organization) return
+    if (!organization || isCreateBlocked) return
 
     setIsCreating(true)
-    setError(null)
+    setCreateError(null)
 
     try {
       if (kind === 'students') {
@@ -609,12 +849,31 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
       }))
       setStudentForm({ fullName: '', nisn: '', email: '', phone: '' })
       setTeacherForm({ name: '', email: '', password: '' })
-      setIsCreateOpen(false)
+      closeCreateDialog()
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : `Failed to create ${kind === 'students' ? 'student' : 'teacher'}.`)
+      setCreateError(requestError instanceof Error ? requestError.message : `Failed to create ${kind === 'students' ? 'student' : 'teacher'}.`)
+      setIsCreateBlocked(true)
     } finally {
       setIsCreating(false)
     }
+  }
+
+  function closeCreateDialog() {
+    setIsCreateOpen(false)
+    setCreateError(null)
+    setIsCreateBlocked(false)
+  }
+
+  function updateStudentForm(updater: (currentForm: typeof studentForm) => typeof studentForm) {
+    setStudentForm(updater)
+    setCreateError(null)
+    setIsCreateBlocked(false)
+  }
+
+  function updateTeacherForm(updater: (currentForm: typeof teacherForm) => typeof teacherForm) {
+    setTeacherForm(updater)
+    setCreateError(null)
+    setIsCreateBlocked(false)
   }
 
   if (!organization) {
@@ -741,7 +1000,14 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
         </CardContent>
       </Card>
 
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+      <Dialog open={isCreateOpen} onOpenChange={(isOpen) => {
+        if (isOpen) {
+          setIsCreateOpen(true)
+          return
+        }
+
+        closeCreateDialog()
+      }}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>{kind === 'students' ? 'Add student' : 'Add teacher'}</DialogTitle>
@@ -755,32 +1021,32 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
             {kind === 'students' ? (
               <>
                 <Field label="Full name">
-                  <Input required value={studentForm.fullName} onChange={(event) => setStudentForm((currentForm) => ({ ...currentForm, fullName: event.target.value }))} />
+                  <Input required value={studentForm.fullName} onChange={(event) => updateStudentForm((currentForm) => ({ ...currentForm, fullName: event.target.value }))} />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="NISN">
-                    <Input value={studentForm.nisn} onChange={(event) => setStudentForm((currentForm) => ({ ...currentForm, nisn: event.target.value }))} />
+                    <Input value={studentForm.nisn} onChange={(event) => updateStudentForm((currentForm) => ({ ...currentForm, nisn: event.target.value }))} />
                   </Field>
                   <Field label="Email">
-                    <Input type="email" value={studentForm.email} onChange={(event) => setStudentForm((currentForm) => ({ ...currentForm, email: event.target.value }))} />
+                    <Input type="email" value={studentForm.email} onChange={(event) => updateStudentForm((currentForm) => ({ ...currentForm, email: event.target.value }))} />
                   </Field>
                 </div>
                 <Field label="Phone">
-                  <Input value={studentForm.phone} onChange={(event) => setStudentForm((currentForm) => ({ ...currentForm, phone: event.target.value }))} />
+                  <Input value={studentForm.phone} onChange={(event) => updateStudentForm((currentForm) => ({ ...currentForm, phone: event.target.value }))} />
                 </Field>
               </>
             ) : (
               <>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Name">
-                    <Input required value={teacherForm.name} onChange={(event) => setTeacherForm((currentForm) => ({ ...currentForm, name: event.target.value }))} />
+                    <Input required value={teacherForm.name} onChange={(event) => updateTeacherForm((currentForm) => ({ ...currentForm, name: event.target.value }))} />
                   </Field>
                   <Field label="Email">
-                    <Input required type="email" value={teacherForm.email} onChange={(event) => setTeacherForm((currentForm) => ({ ...currentForm, email: event.target.value }))} />
+                    <Input required type="email" value={teacherForm.email} onChange={(event) => updateTeacherForm((currentForm) => ({ ...currentForm, email: event.target.value }))} />
                   </Field>
                 </div>
                 <Field label="Development password">
-                  <Input minLength={8} type="password" value={teacherForm.password} onChange={(event) => setTeacherForm((currentForm) => ({ ...currentForm, password: event.target.value }))} />
+                  <Input minLength={8} type="password" value={teacherForm.password} onChange={(event) => updateTeacherForm((currentForm) => ({ ...currentForm, password: event.target.value }))} />
                   <span className={`block text-xs leading-5 ${colors.app.muted}`}>
                     Required when this email does not already exist. Existing users can be added without a password.
                   </span>
@@ -788,11 +1054,17 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
               </>
             )}
 
+            {createError ? (
+              <div className={`rounded-2xl border p-4 text-sm ${colors.danger.subtleBg} ${colors.app.border}`}>
+                {createError}
+              </div>
+            ) : null}
+
             <DialogFooter>
-              <Button disabled={isCreating} type="button" variant="secondary" onClick={() => setIsCreateOpen(false)}>
+              <Button disabled={isCreating} type="button" variant="secondary" onClick={closeCreateDialog}>
                 Cancel
               </Button>
-              <Button disabled={isCreating} type="submit">
+              <Button disabled={isCreating || isCreateBlocked} type="submit">
                 {isCreating ? 'Creating...' : kind === 'students' ? 'Create Student' : 'Create Teacher'}
               </Button>
             </DialogFooter>
@@ -823,6 +1095,13 @@ function formatPermissionLabels(permissions: string[]) {
       return adminPermissionOptions.find(([value]) => value === permission)?.[1] ?? permission
     })
     .join(', ')
+}
+
+function getAdminPermissionDraft(admin: AdminRow): AdminPermissionDraft {
+  return {
+    accessMode: admin.accessMode,
+    permissions: admin.permissions.length > 0 ? admin.permissions : ['students', 'teachers'],
+  }
 }
 
 function formatDate(value: string) {

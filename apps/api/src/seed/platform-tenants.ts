@@ -29,7 +29,7 @@ const tenantSeeds: TenantSeed[] = [
   {
     name: 'Nusantara Academy',
     slug: 'nusantara-academy',
-    status: 'pending_setup',
+    status: 'active',
     description: 'Waiting for the first organization admin to accept their invitation.',
     customDomain: 'nusantara.lessonhub.local',
     adminEmail: 'owner@nusantara.edu',
@@ -139,28 +139,7 @@ for (const tenantSeed of tenantSeeds) {
       select: { id: true },
     })
 
-    if (existingUser) {
-      const passwordAccount = await prisma.account.findFirst({
-        where: {
-          userId: existingUser.id,
-          providerId: 'credential',
-        },
-        select: { id: true },
-      })
-
-      if (!passwordAccount) {
-        await prisma.user.delete({
-          where: { id: existingUser.id },
-        })
-      }
-    }
-
-    const userWithPassword = await prisma.user.findUnique({
-      where: { email: tenantSeed.adminEmail },
-      select: { id: true },
-    })
-
-    if (!userWithPassword) {
+    if (!existingUser) {
       await auth.api.signUpEmail({
         body: {
           name: tenantSeed.adminName,
@@ -168,14 +147,17 @@ for (const tenantSeed of tenantSeeds) {
           password: tenantOwnerPassword,
         },
       })
+
+      await prisma.user.update({
+        where: { email: tenantSeed.adminEmail },
+        data: {
+          emailVerified: true,
+        },
+      })
     }
 
-    const adminUser = await prisma.user.update({
+    const adminUser = await prisma.user.findUniqueOrThrow({
       where: { email: tenantSeed.adminEmail },
-      data: {
-        name: tenantSeed.adminName,
-        emailVerified: true,
-      },
       select: { id: true },
     })
 

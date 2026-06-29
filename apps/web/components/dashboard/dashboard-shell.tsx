@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 
 import { useSession } from '../../lib/auth-client'
+import { applyUserLanguagePreference } from '../../lib/language-preferences'
 import {
   canAccessScreen,
   normalizeSection,
@@ -20,6 +21,7 @@ interface DashboardShellProps {
     resource: string
     action: string
   }>
+  initialLanguage: string
   initialPlatformRole: string
 }
 
@@ -27,6 +29,7 @@ export function DashboardShell({
   initialActiveOrganization,
   initialActiveMembershipRole,
   initialActivePermissions,
+  initialLanguage,
   initialPlatformRole,
 }: DashboardShellProps) {
   const navigate = useNavigate()
@@ -40,6 +43,8 @@ export function DashboardShell({
   })
   const sessionPlatformRole = (session?.user as { platformRole?: string } | undefined)?.platformRole
     ?? initialPlatformRole
+  const sessionLanguage = (session?.user as { language?: string } | undefined)?.language
+    ?? initialLanguage
   const sessionOrgRole = isRoleId(initialActiveMembershipRole)
     ? initialActiveMembershipRole
     : null
@@ -52,6 +57,10 @@ export function DashboardShell({
   useEffect(() => {
     window.localStorage.setItem('schoolhub.dashboard.role', demoRole)
   }, [demoRole])
+
+  useEffect(() => {
+    void applyUserLanguagePreference(sessionLanguage)
+  }, [sessionLanguage])
 
   useEffect(() => {
     if (pathname === '/dashboard') return

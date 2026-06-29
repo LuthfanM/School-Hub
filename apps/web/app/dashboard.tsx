@@ -16,6 +16,7 @@ function DashboardPage() {
       initialActiveOrganization={loaderSession.activeMembership?.organization ?? null}
       initialActiveMembershipRole={loaderSession.activeMembership?.role ?? null}
       initialActivePermissions={loaderSession.activeMembership?.permissions ?? []}
+      initialLanguage={loaderSession.preferences.language}
       initialPlatformRole={loaderSession.user.platformRole ?? 'user'}
     />
   )

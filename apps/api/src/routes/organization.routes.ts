@@ -3,9 +3,12 @@ import { Hono } from 'hono'
 import { getPagination } from '../lib/pagination.js'
 import {
   ADMIN_DASHBOARD_RESOURCES,
+  AdminNotFoundError,
   AdminProvisioningError,
   createOrganizationAdmin,
+  deleteOrganizationAdmin,
   listOrganizationAdmins,
+  updateOrganizationAdminPermissions,
   type AdminDashboardResource,
 } from '../services/organization-admin.service.js'
 import {
@@ -102,6 +105,78 @@ organizationRoutes.post('/:organizationId/admins', async (c) => {
   } catch (error) {
     if (error instanceof AdminProvisioningError) {
       return c.json({ error: error.message }, 400)
+    }
+
+    throw error
+  }
+})
+
+organizationRoutes.patch('/:organizationId/admins/:adminId', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.req.param('organizationId')
+  const adminId = c.req.param('adminId')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const membership = await getOrganizationMembership(user.id, organizationId)
+
+  if (!hasRole(membership, ['owner'])) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  const body = await c.req.json().catch(() => null)
+  const accessMode = body?.accessMode === 'custom' ? 'custom' : 'all'
+  const permissions = parseAdminPermissions(body?.permissions)
+
+  if (accessMode === 'custom' && permissions.length === 0) {
+    return c.json({ error: 'Choose at least one admin permission.' }, 400)
+  }
+
+  try {
+    const admin = await updateOrganizationAdminPermissions({
+      adminId,
+      organizationId,
+      accessMode,
+      permissions,
+    })
+
+    return c.json({ admin })
+  } catch (error) {
+    if (error instanceof AdminNotFoundError) {
+      return c.json({ error: error.message }, 404)
+    }
+
+    throw error
+  }
+})
+
+organizationRoutes.delete('/:organizationId/admins/:adminId', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.req.param('organizationId')
+  const adminId = c.req.param('adminId')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const membership = await getOrganizationMembership(user.id, organizationId)
+
+  if (!hasRole(membership, ['owner'])) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  try {
+    await deleteOrganizationAdmin({
+      adminId,
+      organizationId,
+    })
+
+    return c.json({ success: true })
+  } catch (error) {
+    if (error instanceof AdminNotFoundError) {
+      return c.json({ error: error.message }, 404)
     }
 
     throw error

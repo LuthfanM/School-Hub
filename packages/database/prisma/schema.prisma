@@ -18,6 +18,7 @@ model User {
   emailVerified Boolean   @default(false)
   image         String?
   platformRole  String    @default("user") // user, platform_admin
+  language      String    @default("en") // en, id, ja, ko
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

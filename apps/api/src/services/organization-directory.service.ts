@@ -215,31 +215,43 @@ export async function createTeacher({
         password,
       },
     })
+
+    await prisma.user.update({
+      where: { email },
+      data: { emailVerified: true },
+    })
   }
 
-  const teacherUser = await prisma.user.update({
+  const teacherUser = await prisma.user.findUniqueOrThrow({
     where: { email },
-    data: {
-      name,
-      emailVerified: true,
-    },
     select: { id: true },
   })
 
-  const member = await prisma.member.upsert({
+  const existingMember = await prisma.member.findUnique({
     where: {
       organizationId_userId: {
         organizationId,
         userId: teacherUser.id,
       },
     },
-    create: {
+    select: {
+      role: true,
+    },
+  })
+
+  if (existingMember?.role === 'teacher') {
+    throw new DirectoryProvisioningError('This person is already a teacher in this school.')
+  }
+
+  if (existingMember) {
+    throw new DirectoryProvisioningError('This person already has access to this school.')
+  }
+
+  const member = await prisma.member.create({
+    data: {
       id: randomUUID(),
       organizationId,
       userId: teacherUser.id,
-      role: 'teacher',
-    },
-    update: {
       role: 'teacher',
     },
     select: { id: true },

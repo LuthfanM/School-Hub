@@ -1,5 +1,9 @@
 import { prisma } from '@schoolhub/database'
 
+export const SUPPORTED_LANGUAGES = ['en', 'id', 'ja', 'ko'] as const
+
+export type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number]
+
 interface SessionMembershipRecord {
   id: string
   role: string
@@ -16,28 +20,36 @@ interface SessionMembershipRecord {
 }
 
 export async function getSessionPayload(userId: string) {
-  const memberships = await prisma.member.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'asc' },
-    select: {
-      id: true,
-      role: true,
-      permissions: {
-        select: {
-          resource: true,
-          action: true,
+  const [userPreferences, memberships] = await prisma.$transaction([
+    prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: {
+        language: true,
+      },
+    }),
+    prisma.member.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        role: true,
+        permissions: {
+          select: {
+            resource: true,
+            action: true,
+          },
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            status: true,
+          },
         },
       },
-      organization: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          status: true,
-        },
-      },
-    },
-  })
+    }),
+  ])
 
   const serializedMemberships = memberships.map((membership: SessionMembershipRecord) => ({
     id: membership.id,
@@ -49,17 +61,39 @@ export async function getSessionPayload(userId: string) {
   const activeMembership = serializedMemberships
     .filter((membership) => membership.organization.status === 'active')
     .reduce<(typeof serializedMemberships)[number] | null>((current, membership) => {
-    if (!current) return membership
+      if (!current) return membership
 
-    return getMembershipRolePriority(membership.role) < getMembershipRolePriority(current.role)
-      ? membership
-      : current
-  }, null)
+      return getMembershipRolePriority(membership.role) < getMembershipRolePriority(current.role)
+        ? membership
+        : current
+    }, null)
 
   return {
+    preferences: {
+      language: normalizeLanguage(userPreferences.language),
+    },
     memberships: serializedMemberships,
     activeMembership,
   }
+}
+
+export async function updateUserLanguagePreference(userId: string, language: string) {
+  const normalizedLanguage = normalizeLanguage(language)
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      language: normalizedLanguage,
+    },
+  })
+
+  return {
+    language: normalizedLanguage,
+  }
+}
+
+export function isSupportedLanguage(value: string): value is SupportedLanguage {
+  return SUPPORTED_LANGUAGES.includes(value as SupportedLanguage)
 }
 
 export async function getLoginContext(email: string) {
@@ -137,4 +171,8 @@ function getMembershipRolePriority(role: string) {
   if (role === 'student') return 3
 
   return 4
+}
+
+function normalizeLanguage(language: string) {
+  return isSupportedLanguage(language) ? language : 'en'
 }

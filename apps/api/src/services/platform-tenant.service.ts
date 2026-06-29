@@ -166,33 +166,40 @@ async function provisionFirstOwner({
         password,
       },
     })
+
+    await prisma.user.update({
+      where: { email },
+      data: { emailVerified: true },
+    })
   }
 
-  const adminUser = await prisma.user.update({
+  const adminUser = await prisma.user.findUniqueOrThrow({
     where: { email },
-    data: {
-      emailVerified: true,
-    },
     select: { id: true },
   })
 
-  await prisma.member.upsert({
+  const existingMember = await prisma.member.findUnique({
     where: {
       organizationId_userId: {
         organizationId,
         userId: adminUser.id,
       },
     },
-    create: {
-      id: randomUUID(),
-      organizationId,
-      userId: adminUser.id,
-      role: 'owner',
-    },
-    update: {
-      role: 'owner',
+    select: {
+      id: true,
     },
   })
+
+  if (!existingMember) {
+    await prisma.member.create({
+      data: {
+        id: randomUUID(),
+        organizationId,
+        userId: adminUser.id,
+        role: 'owner',
+      },
+    })
+  }
 
   await prisma.invitation.updateMany({
     where: {

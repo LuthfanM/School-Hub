@@ -34,6 +34,13 @@ export interface CreateOrganizationAdminInput {
   permissions: AdminDashboardResource[]
 }
 
+export interface UpdateOrganizationAdminPermissionsInput {
+  adminId: string
+  organizationId: string
+  accessMode: 'all' | 'custom'
+  permissions: AdminDashboardResource[]
+}
+
 export async function listOrganizationAdmins({
   organizationId,
   pagination,
@@ -111,31 +118,43 @@ export async function createOrganizationAdmin(input: CreateOrganizationAdminInpu
         password: input.password,
       },
     })
+
+    await prisma.user.update({
+      where: { email: input.email },
+      data: { emailVerified: true },
+    })
   }
 
-  const adminUser = await prisma.user.update({
+  const adminUser = await prisma.user.findUniqueOrThrow({
     where: { email: input.email },
-    data: {
-      name: input.name,
-      emailVerified: true,
-    },
     select: { id: true },
   })
 
-  const member = await prisma.member.upsert({
+  const existingMember = await prisma.member.findUnique({
     where: {
       organizationId_userId: {
         organizationId: input.organizationId,
         userId: adminUser.id,
       },
     },
-    create: {
+    select: {
+      role: true,
+    },
+  })
+
+  if (existingMember?.role === 'admin') {
+    throw new AdminProvisioningError('This person is already an admin in this school.')
+  }
+
+  if (existingMember) {
+    throw new AdminProvisioningError('This person already has access to this school.')
+  }
+
+  const member = await prisma.member.create({
+    data: {
       id: randomUUID(),
       organizationId: input.organizationId,
       userId: adminUser.id,
-      role: 'admin',
-    },
-    update: {
       role: 'admin',
     },
     select: {
@@ -143,30 +162,11 @@ export async function createOrganizationAdmin(input: CreateOrganizationAdminInpu
     },
   })
 
-  const permissionRows = input.accessMode === 'all'
-    ? [ADMIN_PERMISSION_ALL]
-    : input.permissions.map((permission) => ({
-        resource: `dashboard.${permission}`,
-        action: 'read',
-      }))
-
-  await prisma.$transaction([
-    prisma.memberPermission.deleteMany({
-      where: { memberId: member.id },
-    }),
-    ...(permissionRows.length > 0
-      ? [
-          prisma.memberPermission.createMany({
-            data: permissionRows.map((permission) => ({
-              memberId: member.id,
-              resource: permission.resource,
-              action: permission.action,
-            })),
-            skipDuplicates: true,
-          }),
-        ]
-      : []),
-  ])
+  await replaceAdminPermissions({
+    accessMode: input.accessMode,
+    memberId: member.id,
+    permissions: input.permissions,
+  })
 
   const createdAdmin = await prisma.member.findUniqueOrThrow({
     where: { id: member.id },
@@ -192,6 +192,112 @@ export async function createOrganizationAdmin(input: CreateOrganizationAdminInpu
   })
 
   return serializeAdmin(createdAdmin)
+}
+
+export async function updateOrganizationAdminPermissions(input: UpdateOrganizationAdminPermissionsInput) {
+  const admin = await prisma.member.findFirst({
+    where: {
+      id: input.adminId,
+      organizationId: input.organizationId,
+      role: 'admin',
+    },
+    select: { id: true },
+  })
+
+  if (!admin) {
+    throw new AdminNotFoundError('Admin member was not found in this organization.')
+  }
+
+  await replaceAdminPermissions({
+    accessMode: input.accessMode,
+    memberId: admin.id,
+    permissions: input.permissions,
+  })
+
+  const updatedAdmin = await prisma.member.findUniqueOrThrow({
+    where: { id: admin.id },
+    select: {
+      id: true,
+      role: true,
+      createdAt: true,
+      permissions: {
+        select: {
+          resource: true,
+          action: true,
+        },
+      },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          emailVerified: true,
+        },
+      },
+    },
+  })
+
+  return serializeAdmin(updatedAdmin)
+}
+
+export async function deleteOrganizationAdmin({
+  adminId,
+  organizationId,
+}: {
+  adminId: string
+  organizationId: string
+}) {
+  const admin = await prisma.member.findFirst({
+    where: {
+      id: adminId,
+      organizationId,
+      role: 'admin',
+    },
+    select: { id: true },
+  })
+
+  if (!admin) {
+    throw new AdminNotFoundError('Admin member was not found in this organization.')
+  }
+
+  await prisma.member.delete({
+    where: { id: admin.id },
+  })
+}
+
+async function replaceAdminPermissions({
+  accessMode,
+  memberId,
+  permissions,
+}: {
+  accessMode: 'all' | 'custom'
+  memberId: string
+  permissions: AdminDashboardResource[]
+}) {
+  const permissionRows = accessMode === 'all'
+    ? [ADMIN_PERMISSION_ALL]
+    : permissions.map((permission) => ({
+        resource: `dashboard.${permission}`,
+        action: 'read',
+      }))
+
+  await prisma.$transaction([
+    prisma.memberPermission.deleteMany({
+      where: { memberId },
+    }),
+    ...(permissionRows.length > 0
+      ? [
+          prisma.memberPermission.createMany({
+            data: permissionRows.map((permission) => ({
+              memberId,
+              resource: permission.resource,
+              action: permission.action,
+            })),
+            skipDuplicates: true,
+          }),
+        ]
+      : []),
+  ])
 }
 
 function serializeAdmin(admin: {
@@ -227,3 +333,4 @@ function serializeAdmin(admin: {
 }
 
 export class AdminProvisioningError extends Error {}
+export class AdminNotFoundError extends Error {}
