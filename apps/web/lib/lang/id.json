@@ -1,0 +1,11 @@
+{
+  "app": {
+    "name": "SchoolHub"
+  },
+  "language": {
+    "en": "Inggris",
+    "id": "Indonesia",
+    "ja": "Jepang",
+    "ko": "Korea"
+  }
+}
