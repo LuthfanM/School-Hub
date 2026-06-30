@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import { prisma } from '@schoolhub/database'
 
-import { auth } from '../auth/index.js'
+import { auth, getDevelopmentResetPasswordLink } from '../auth/index.js'
 
 export interface CreateTenantInput {
   name: string
@@ -144,6 +144,67 @@ export async function createPlatformTenant(input: CreateTenantInput) {
   return serializeTenant(createdTenant)
 }
 
+export async function requestTenantAdminPasswordReset({
+  email,
+  organizationId,
+  redirectTo,
+}: {
+  email: string | null
+  organizationId: string
+  redirectTo: string
+}) {
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: {
+      name: true,
+      members: {
+        where: {
+          role: { in: ['owner', 'admin'] },
+          ...(email
+            ? {
+                user: {
+                  email,
+                },
+              }
+            : {}),
+        },
+        orderBy: { createdAt: 'asc' },
+        take: 1,
+        select: {
+          user: {
+            select: {
+              email: true,
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (!organization) {
+    throw new TenantResetPasswordError('Tenant was not found.')
+  }
+
+  const adminEmail = organization.members[0]?.user.email
+
+  if (!adminEmail) {
+    throw new TenantResetPasswordError('This tenant does not have an owner/admin user account to reset yet.')
+  }
+
+  await auth.api.requestPasswordReset({
+    body: {
+      email: adminEmail,
+      redirectTo,
+    },
+  })
+
+  return {
+    email: adminEmail,
+    resetUrl: getDevelopmentResetPasswordLink(adminEmail),
+    tenantName: organization.name,
+  }
+}
+
 async function provisionFirstOwner({
   email,
   organizationId,
@@ -253,3 +314,4 @@ function serializeTenant(organization: {
 }
 
 export class TenantConflictError extends Error {}
+export class TenantResetPasswordError extends Error {}

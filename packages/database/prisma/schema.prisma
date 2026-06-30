@@ -12,24 +12,26 @@ datasource db {
 // ============================================================================
 
 model User {
-  id            String    @id
-  name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  image         String?
-  platformRole  String    @default("user") // user, platform_admin
-  language      String    @default("en") // en, id, ja, ko
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                   String   @id
+  name                 String
+  email                String   @unique
+  emailVerified        Boolean  @default(false)
+  image                String?
+  platformRole         String   @default("user") // user, platform_admin
+  language             String   @default("en") // en, id, ja, ko
+  activeOrganizationId String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-  sessions              Session[]
-  accounts              Account[]
-  organizationMembers   Member[]
-  organizationInvites   Invitation[]       @relation("inviterUser")
-  coursesCreated        Course[]           @relation("courseCreatedByUser")
-  lessonsCreated        Lesson[]           @relation("lessonCreatedByUser")
-  enrollmentsCreatedBy  CourseEnrollment[] @relation("enrolledByUser")
-  studentProfile        Student?
+  sessions                  Session[]
+  accounts                  Account[]
+  organizationMembers       Member[]
+  organizationInvites       Invitation[]        @relation("inviterUser")
+  coursesCreated            Course[]            @relation("courseCreatedByUser")
+  lessonsCreated            Lesson[]            @relation("lessonCreatedByUser")
+  enrollmentsCreatedBy      CourseEnrollment[]  @relation("enrolledByUser")
+  classAnnouncementsCreated ClassAnnouncement[] @relation("classAnnouncementCreatedByUser")
+  studentProfile            Student?
 
   @@map("user")
 }
@@ -98,13 +100,16 @@ model Organization {
   customDomain String?  @unique
   createdAt    DateTime @default(now())
 
-  members           Member[]
-  invitations       Invitation[]
-  students          Student[]
-  courses           Course[]
-  lessons           Lesson[]
-  courseEnrollments CourseEnrollment[]
-  lessonProgress    LessonProgress[]
+  members            Member[]
+  invitations        Invitation[]
+  students           Student[]
+  studentCredentials StudentCredential[]
+  studentSessions    StudentSession[]
+  schoolClasses      SchoolClass[]
+  courses            Course[]
+  lessons            Lesson[]
+  courseEnrollments  CourseEnrollment[]
+  lessonProgress     LessonProgress[]
 
   @@index([slug])
   @@index([status])
@@ -118,9 +123,11 @@ model Member {
   role           String
   createdAt      DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  permissions  MemberPermission[]
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions     MemberPermission[]
+  homeroomClasses SchoolClass[]      @relation("ClassHomeroomTeacher")
+  subjectClasses  ClassSubject[]
 
   @@unique([organizationId, userId])
   @@index([organizationId])
@@ -181,16 +188,138 @@ model Student {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
-  enrollments  CourseEnrollment[]
-  progress     LessonProgress[]
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user             User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  classMemberships ClassStudent[]
+  enrollments      CourseEnrollment[]
+  progress         LessonProgress[]
+  credential       StudentCredential?
+  sessions         StudentSession[]
 
   @@unique([organizationId, nisn])
   @@index([organizationId])
   @@index([userId])
   @@index([status])
   @@map("students")
+}
+
+model StudentCredential {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  studentId          String    @unique
+  username           String    @db.VarChar(80)
+  passwordHash       String
+  mustChangePassword Boolean   @default(true)
+  failedLoginCount   Int       @default(0)
+  lockedUntil        DateTime?
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, username])
+  @@index([organizationId])
+  @@index([studentId])
+  @@map("student_credentials")
+}
+
+model StudentSession {
+  id             String   @id @default(cuid())
+  token          String   @unique
+  organizationId String
+  studentId      String
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([studentId])
+  @@index([expiresAt])
+  @@map("student_sessions")
+}
+
+model SchoolClass {
+  id                String   @id @default(cuid())
+  organizationId    String
+  name              String   @db.VarChar(255)
+  code              String   @db.VarChar(80)
+  academicYear      String   @db.VarChar(32)
+  capacity          Int      @default(30)
+  status            String   @default("active") // active, archived
+  homeroomTeacherId String?
+  averageScore      Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  homeroomTeacher Member?             @relation("ClassHomeroomTeacher", fields: [homeroomTeacherId], references: [id], onDelete: SetNull)
+  students        ClassStudent[]
+  subjects        ClassSubject[]
+  announcements   ClassAnnouncement[]
+
+  @@unique([organizationId, code, academicYear])
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([homeroomTeacherId])
+  @@map("classes")
+}
+
+model ClassAnnouncement {
+  id        String   @id @default(cuid())
+  classId   String
+  title     String   @db.VarChar(255)
+  body      String   @db.Text
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  class         SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  createdByUser User        @relation("classAnnouncementCreatedByUser", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([classId])
+  @@index([createdBy])
+  @@map("class_announcements")
+}
+
+model ClassStudent {
+  id        String   @id @default(cuid())
+  classId   String
+  studentId String
+  status    String   @default("active") // active, transferred, dropped
+  joinedAt  DateTime @default(now())
+
+  class   SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, studentId])
+  @@index([classId])
+  @@index([studentId])
+  @@index([status])
+  @@map("class_students")
+}
+
+model ClassSubject {
+  id              String   @id @default(cuid())
+  classId         String
+  teacherMemberId String?
+  subjectName     String   @db.VarChar(255)
+  room            String?  @db.VarChar(80)
+  dayOfWeek       String?  @db.VarChar(16)
+  startTime       String?  @db.VarChar(8)
+  endTime         String?  @db.VarChar(8)
+  createdAt       DateTime @default(now())
+
+  class         SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacherMember Member?     @relation(fields: [teacherMemberId], references: [id], onDelete: SetNull)
+
+  @@index([classId])
+  @@index([teacherMemberId])
+  @@map("class_subjects")
 }
 
 model Course {

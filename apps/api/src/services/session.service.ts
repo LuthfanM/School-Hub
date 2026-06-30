@@ -24,6 +24,7 @@ export async function getSessionPayload(userId: string) {
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: {
+        activeOrganizationId: true,
         language: true,
       },
     }),
@@ -58,22 +59,51 @@ export async function getSessionPayload(userId: string) {
     organization: membership.organization,
   }))
 
-  const activeMembership = serializedMemberships
-    .filter((membership) => membership.organization.status === 'active')
-    .reduce<(typeof serializedMemberships)[number] | null>((current, membership) => {
-      if (!current) return membership
-
-      return getMembershipRolePriority(membership.role) < getMembershipRolePriority(current.role)
-        ? membership
-        : current
-    }, null)
+  const activeMemberships = serializedMemberships.filter((membership) => membership.organization.status === 'active')
+  const preferredMembership = activeMemberships.find((membership) => {
+    return membership.organization.id === userPreferences.activeOrganizationId
+  }) ?? null
+  const activeMembership = preferredMembership ?? (activeMemberships.length === 1 ? activeMemberships[0] ?? null : null)
 
   return {
     preferences: {
+      activeOrganizationId: activeMembership?.organization.id ?? null,
       language: normalizeLanguage(userPreferences.language),
     },
     memberships: serializedMemberships,
     activeMembership,
+    hasMultipleActiveMemberships: activeMemberships.length > 1,
+    requiresOrganizationSelection: activeMemberships.length > 1 && !activeMembership,
+  }
+}
+
+export async function updateUserActiveOrganizationPreference(userId: string, organizationId: string) {
+  const membership = await prisma.member.findFirst({
+    where: {
+      userId,
+      organizationId,
+      organization: {
+        status: 'active',
+      },
+    },
+    select: {
+      organizationId: true,
+    },
+  })
+
+  if (!membership) {
+    throw new ActiveOrganizationPreferenceError('Organization is not available for this account.')
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      activeOrganizationId: membership.organizationId,
+    },
+  })
+
+  return {
+    activeOrganizationId: membership.organizationId,
   }
 }
 
@@ -95,6 +125,8 @@ export async function updateUserLanguagePreference(userId: string, language: str
 export function isSupportedLanguage(value: string): value is SupportedLanguage {
   return SUPPORTED_LANGUAGES.includes(value as SupportedLanguage)
 }
+
+export class ActiveOrganizationPreferenceError extends Error {}
 
 export async function getLoginContext(email: string) {
   const normalizedEmail = email.trim().toLowerCase()
@@ -162,15 +194,6 @@ export async function getLoginContext(email: string) {
   }
 
   return { status: 'unknown' as const }
-}
-
-function getMembershipRolePriority(role: string) {
-  if (role === 'owner') return 0
-  if (role === 'admin') return 1
-  if (role === 'teacher') return 2
-  if (role === 'student') return 3
-
-  return 4
 }
 
 function normalizeLanguage(language: string) {

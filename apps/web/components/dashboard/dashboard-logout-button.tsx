@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { LogOut } from 'lucide-react'
 
 import { signOut } from '../../lib/auth-client'
+import { apiRequest } from '../../lib/api'
 import { dashboardColors } from '../../styles/colors'
 
 interface DashboardLogoutButtonProps {
@@ -26,6 +27,7 @@ export function DashboardLogoutButton({
 
     try {
       await signOut()
+      await apiRequest('/api/student-auth/logout', { method: 'POST' }).catch(() => null)
     } finally {
       window.localStorage.removeItem('schoolhub.dashboard.role')
       await navigate({ to: '/auth/login', replace: true })

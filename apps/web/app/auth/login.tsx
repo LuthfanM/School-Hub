@@ -15,6 +15,10 @@ export const Route = createFileRoute('/auth/login')({
       throw redirect({ to: '/dashboard' })
     }
 
+    if (redirectTarget === '/choose-organization') {
+      throw redirect({ to: '/choose-organization' })
+    }
+
     return null
   },
   component: LoginPage,
@@ -55,14 +59,24 @@ function LoginPage() {
       user: {
         platformRole?: string | null
       }
+      memberships?: Array<{
+        organization: {
+          status: string
+        }
+      }>
+      hasMultipleActiveMemberships?: boolean
+      requiresOrganizationSelection?: boolean
       activeMembership?: {
         organization: {
           status: string
         }
       } | null
     }>('/api/session').catch(() => null)
+    const activeMembershipCount = session?.memberships?.filter((membership) => {
+      return membership.organization.status === 'active'
+    }).length ?? 0
 
-    if (!session?.activeMembership && session?.user.platformRole !== 'platform_admin') {
+    if (!session?.activeMembership && !session?.requiresOrganizationSelection && session?.user.platformRole !== 'platform_admin') {
       await signOut()
       setError('No active organization workspace is available for this account.')
       setIsSubmitting(false)
@@ -70,6 +84,11 @@ function LoginPage() {
     }
 
     setIsSubmitting(false)
+    if (session.requiresOrganizationSelection || session.hasMultipleActiveMemberships || activeMembershipCount > 1) {
+      await navigate({ to: '/choose-organization' })
+      return
+    }
+
     await navigate({ to: '/dashboard' })
   }
 
@@ -106,6 +125,9 @@ function LoginPage() {
         </form>
         <p className="mt-6 text-sm text-[#6F6A62]">
           New school? <Link to="/auth/register" className="font-semibold text-[#2563EB]">Create account</Link>
+        </p>
+        <p className="mt-3 text-sm text-[#6F6A62]">
+          Student account? <Link to="/auth/student-login" className="font-semibold text-[#2563EB]">Login as student</Link>
         </p>
         </CardContent>
       </Card>

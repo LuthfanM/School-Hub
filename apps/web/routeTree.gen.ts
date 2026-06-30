@@ -11,8 +11,12 @@
 import { Route as rootRouteImport } from './app/__root'
 import { Route as DemoRouteImport } from './app/demo'
 import { Route as DashboardRouteImport } from './app/dashboard'
+import { Route as ChooseOrganizationRouteImport } from './app/choose-organization'
 import { Route as IndexRouteImport } from './app/index'
 import { Route as DashboardSectionRouteImport } from './app/dashboard/$section'
+import { Route as AuthStudentLoginRouteImport } from './app/auth/student-login'
+import { Route as AuthStudentChangePasswordRouteImport } from './app/auth/student-change-password'
+import { Route as AuthResetPasswordRouteImport } from './app/auth/reset-password'
 import { Route as AuthRegisterRouteImport } from './app/auth/register'
 import { Route as AuthLoginRouteImport } from './app/auth/login'
 import { Route as DashboardStudentsSuccessRouteImport } from './app/dashboard/students/success'
@@ -28,6 +32,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChooseOrganizationRoute = ChooseOrganizationRouteImport.update({
+  id: '/choose-organization',
+  path: '/choose-organization',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -37,6 +46,22 @@ const DashboardSectionRoute = DashboardSectionRouteImport.update({
   id: '/$section',
   path: '/$section',
   getParentRoute: () => DashboardRoute,
+} as any)
+const AuthStudentLoginRoute = AuthStudentLoginRouteImport.update({
+  id: '/auth/student-login',
+  path: '/auth/student-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthStudentChangePasswordRoute =
+  AuthStudentChangePasswordRouteImport.update({
+    id: '/auth/student-change-password',
+    path: '/auth/student-change-password',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
+  id: '/auth/reset-password',
+  path: '/auth/reset-password',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRegisterRoute = AuthRegisterRouteImport.update({
   id: '/auth/register',
@@ -62,20 +87,28 @@ const DashboardStudentsNewRoute = DashboardStudentsNewRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/choose-organization': typeof ChooseOrganizationRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/demo': typeof DemoRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/register': typeof AuthRegisterRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/auth/student-change-password': typeof AuthStudentChangePasswordRoute
+  '/auth/student-login': typeof AuthStudentLoginRoute
   '/dashboard/$section': typeof DashboardSectionRoute
   '/dashboard/students/new': typeof DashboardStudentsNewRoute
   '/dashboard/students/success': typeof DashboardStudentsSuccessRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/choose-organization': typeof ChooseOrganizationRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/demo': typeof DemoRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/register': typeof AuthRegisterRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/auth/student-change-password': typeof AuthStudentChangePasswordRoute
+  '/auth/student-login': typeof AuthStudentLoginRoute
   '/dashboard/$section': typeof DashboardSectionRoute
   '/dashboard/students/new': typeof DashboardStudentsNewRoute
   '/dashboard/students/success': typeof DashboardStudentsSuccessRoute
@@ -83,10 +116,14 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/choose-organization': typeof ChooseOrganizationRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/demo': typeof DemoRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/register': typeof AuthRegisterRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/auth/student-change-password': typeof AuthStudentChangePasswordRoute
+  '/auth/student-login': typeof AuthStudentLoginRoute
   '/dashboard/$section': typeof DashboardSectionRoute
   '/dashboard/students/new': typeof DashboardStudentsNewRoute
   '/dashboard/students/success': typeof DashboardStudentsSuccessRoute
@@ -95,30 +132,42 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/choose-organization'
     | '/dashboard'
     | '/demo'
     | '/auth/login'
     | '/auth/register'
+    | '/auth/reset-password'
+    | '/auth/student-change-password'
+    | '/auth/student-login'
     | '/dashboard/$section'
     | '/dashboard/students/new'
     | '/dashboard/students/success'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/choose-organization'
     | '/dashboard'
     | '/demo'
     | '/auth/login'
     | '/auth/register'
+    | '/auth/reset-password'
+    | '/auth/student-change-password'
+    | '/auth/student-login'
     | '/dashboard/$section'
     | '/dashboard/students/new'
     | '/dashboard/students/success'
   id:
     | '__root__'
     | '/'
+    | '/choose-organization'
     | '/dashboard'
     | '/demo'
     | '/auth/login'
     | '/auth/register'
+    | '/auth/reset-password'
+    | '/auth/student-change-password'
+    | '/auth/student-login'
     | '/dashboard/$section'
     | '/dashboard/students/new'
     | '/dashboard/students/success'
@@ -126,10 +175,14 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ChooseOrganizationRoute: typeof ChooseOrganizationRoute
   DashboardRoute: typeof DashboardRouteWithChildren
   DemoRoute: typeof DemoRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthRegisterRoute: typeof AuthRegisterRoute
+  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
+  AuthStudentChangePasswordRoute: typeof AuthStudentChangePasswordRoute
+  AuthStudentLoginRoute: typeof AuthStudentLoginRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -148,6 +201,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/choose-organization': {
+      id: '/choose-organization'
+      path: '/choose-organization'
+      fullPath: '/choose-organization'
+      preLoaderRoute: typeof ChooseOrganizationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -161,6 +221,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/$section'
       preLoaderRoute: typeof DashboardSectionRouteImport
       parentRoute: typeof DashboardRoute
+    }
+    '/auth/student-login': {
+      id: '/auth/student-login'
+      path: '/auth/student-login'
+      fullPath: '/auth/student-login'
+      preLoaderRoute: typeof AuthStudentLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/student-change-password': {
+      id: '/auth/student-change-password'
+      path: '/auth/student-change-password'
+      fullPath: '/auth/student-change-password'
+      preLoaderRoute: typeof AuthStudentChangePasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/reset-password': {
+      id: '/auth/reset-password'
+      path: '/auth/reset-password'
+      fullPath: '/auth/reset-password'
+      preLoaderRoute: typeof AuthResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/auth/register': {
       id: '/auth/register'
@@ -211,10 +292,14 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ChooseOrganizationRoute: ChooseOrganizationRoute,
   DashboardRoute: DashboardRouteWithChildren,
   DemoRoute: DemoRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthRegisterRoute: AuthRegisterRoute,
+  AuthResetPasswordRoute: AuthResetPasswordRoute,
+  AuthStudentChangePasswordRoute: AuthStudentChangePasswordRoute,
+  AuthStudentLoginRoute: AuthStudentLoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

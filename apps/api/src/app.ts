@@ -8,6 +8,7 @@ import { healthRoutes } from './routes/health.routes.js'
 import { organizationRoutes } from './routes/organization.routes.js'
 import { platformRoutes } from './routes/platform.routes.js'
 import { sessionRoutes } from './routes/session.routes.js'
+import { studentAuthRoutes } from './routes/student-auth.routes.js'
 import type { AppEnv } from './types/app-env.js'
 
 export function createApp() {
@@ -33,6 +34,7 @@ export function createApp() {
 
   app.route('/', healthRoutes)
   app.route('/api', sessionRoutes)
+  app.route('/api', studentAuthRoutes)
   app.route('/api/organizations', organizationRoutes)
   app.route('/api/platform', platformRoutes)
 
