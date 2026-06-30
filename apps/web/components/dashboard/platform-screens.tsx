@@ -58,6 +58,14 @@ interface PlatformTenantCreateResponse {
   tenant: PlatformTenant
 }
 
+interface PlatformTenantResetPasswordResponse {
+  reset: {
+    email: string
+    resetUrl: string | null
+    tenantName: string
+  }
+}
+
 interface CreateTenantForm {
   name: string
   slug: string
@@ -113,6 +121,8 @@ export function PlatformTenantsScreen() {
   const [error, setError] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [isResettingPassword, setIsResettingPassword] = useState(false)
+  const [resetPasswordResult, setResetPasswordResult] = useState<PlatformTenantResetPasswordResponse['reset'] | null>(null)
   const [form, setForm] = useState<CreateTenantForm>(emptyCreateTenantForm)
 
   useEffect(() => {
@@ -202,6 +212,30 @@ export function PlatformTenantsScreen() {
     }
   }
 
+  async function resetTenantAdminPassword(tenant: PlatformTenant) {
+    if (!tenant.firstAdminEmail) return
+
+    setIsResettingPassword(true)
+    setResetPasswordResult(null)
+    setError(null)
+
+    try {
+      const response = await apiRequest<PlatformTenantResetPasswordResponse>(`/api/platform/tenants/${tenant.id}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify({
+          email: tenant.firstAdminEmail,
+          redirectTo: `${window.location.origin}/auth/reset-password`,
+        }),
+      })
+
+      setResetPasswordResult(response.reset)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Failed to create reset password link.')
+    } finally {
+      setIsResettingPassword(false)
+    }
+  }
+
   return (
     <div className="w-full space-y-6">
       <Card className={`rounded-[28px] ${dashboardColors.card}`}>
@@ -271,7 +305,10 @@ export function PlatformTenantsScreen() {
                   </TableRow>
                 ) : null}
                 {!isLoading
-                  ? filteredTenants.map((tenant) => (
+                  ? filteredTenants.map((tenant) => {
+                    const canResetPassword = Boolean(tenant.firstAdminEmail && tenant.memberCount > 0)
+
+                    return (
                     <TableRow key={tenant.id} className={`${colors.app.border} ${colors.app.backgroundHover}`}>
                       <TableCell className="min-w-56 font-semibold">{tenant.name}</TableCell>
                       <TableCell className={`whitespace-nowrap font-mono text-sm ${colors.app.muted}`}>{tenant.slug}</TableCell>
@@ -280,12 +317,25 @@ export function PlatformTenantsScreen() {
                       <TableCell className="whitespace-nowrap">{formatUsage(tenant)}</TableCell>
                       <TableCell className={`whitespace-nowrap ${colors.app.muted}`}>{formatDate(tenant.createdAt)}</TableCell>
                       <TableCell>
-                        <Button size="sm" type="button" variant="secondary">
-                          Review
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button size="sm" type="button" variant="secondary">
+                            Review
+                          </Button>
+                          <Button
+                            disabled={!canResetPassword || isResettingPassword}
+                            size="sm"
+                            title={canResetPassword ? `Reset password for ${tenant.firstAdminEmail}` : 'No admin account to reset yet'}
+                            type="button"
+                            variant="secondary"
+                            onClick={() => resetTenantAdminPassword(tenant)}
+                          >
+                            <KeyRound className="h-4 w-4" /> Reset password
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                    )
+                  })
                   : null}
               </TableBody>
             </Table>
@@ -324,6 +374,13 @@ export function PlatformTenantsScreen() {
         onOpenChange={setIsCreateOpen}
         onSubmit={createTenant}
         onUpdateForm={updateForm}
+      />
+
+      <ResetPasswordLinkDialog
+        reset={resetPasswordResult}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setResetPasswordResult(null)
+        }}
       />
     </div>
   )
@@ -489,6 +546,57 @@ function CreateTenantDialog({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ResetPasswordLinkDialog({
+  onOpenChange,
+  reset,
+}: {
+  onOpenChange: (isOpen: boolean) => void
+  reset: PlatformTenantResetPasswordResponse['reset'] | null
+}) {
+  return (
+    <Dialog open={Boolean(reset)} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Reset password link created</DialogTitle>
+          <DialogDescription>
+            In production this link will be sent by email. For local testing, open this development link manually.
+          </DialogDescription>
+        </DialogHeader>
+
+        {reset ? (
+          <div className="space-y-4">
+            <div className={`rounded-2xl border p-4 text-sm ${dashboardColors.panel}`}>
+              <p className="font-semibold">{reset.tenantName}</p>
+              <p className={`mt-1 ${colors.app.muted}`}>{reset.email}</p>
+            </div>
+
+            {reset.resetUrl ? (
+              <div className="space-y-3">
+                <Input readOnly value={reset.resetUrl} />
+                <Button asChild>
+                  <a href={reset.resetUrl} rel="noreferrer" target="_blank">
+                    Open reset link
+                  </a>
+                </Button>
+              </div>
+            ) : (
+              <div className={`rounded-2xl border p-4 text-sm ${colors.warning.subtleBg} ${colors.app.border}`}>
+                Reset email was requested, but no development link was captured. Check the API server log.
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

@@ -4,6 +4,8 @@ import {
   createPlatformTenant,
   listPlatformTenants,
   TenantConflictError,
+  TenantResetPasswordError,
+  requestTenantAdminPasswordReset,
 } from '../services/platform-tenant.service.js'
 import type { AppEnv } from '../types/app-env.js'
 
@@ -82,6 +84,39 @@ platformRoutes.post('/tenants', async (c) => {
   } catch (error) {
     if (error instanceof TenantConflictError) {
       return c.json({ error: error.message }, 409)
+    }
+
+    throw error
+  }
+})
+
+platformRoutes.post('/tenants/:tenantId/reset-password', async (c) => {
+  const tenantId = c.req.param('tenantId')
+  const body = await c.req.json().catch(() => null)
+  const email =
+    typeof body?.email === 'string' && body.email.trim()
+      ? body.email.trim().toLowerCase()
+      : null
+  const redirectTo =
+    typeof body?.redirectTo === 'string' && body.redirectTo.trim()
+      ? body.redirectTo.trim()
+      : `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/auth/reset-password`
+
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return c.json({ error: 'Admin email is not valid.' }, 400)
+  }
+
+  try {
+    const reset = await requestTenantAdminPasswordReset({
+      email,
+      organizationId: tenantId,
+      redirectTo,
+    })
+
+    return c.json({ reset })
+  } catch (error) {
+    if (error instanceof TenantResetPasswordError) {
+      return c.json({ error: error.message }, 400)
     }
 
     throw error

@@ -59,6 +59,11 @@ function LoginPage() {
       user: {
         platformRole?: string | null
       }
+      memberships?: Array<{
+        organization: {
+          status: string
+        }
+      }>
       hasMultipleActiveMemberships?: boolean
       requiresOrganizationSelection?: boolean
       activeMembership?: {
@@ -67,6 +72,9 @@ function LoginPage() {
         }
       } | null
     }>('/api/session').catch(() => null)
+    const activeMembershipCount = session?.memberships?.filter((membership) => {
+      return membership.organization.status === 'active'
+    }).length ?? 0
 
     if (!session?.activeMembership && !session?.requiresOrganizationSelection && session?.user.platformRole !== 'platform_admin') {
       await signOut()
@@ -76,7 +84,7 @@ function LoginPage() {
     }
 
     setIsSubmitting(false)
-    if (session.requiresOrganizationSelection || session.hasMultipleActiveMemberships) {
+    if (session.requiresOrganizationSelection || session.hasMultipleActiveMemberships || activeMembershipCount > 1) {
       await navigate({ to: '/choose-organization' })
       return
     }

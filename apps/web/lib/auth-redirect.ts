@@ -5,6 +5,11 @@ interface AuthRedirectSession {
   user: {
     platformRole?: string | null
   }
+  memberships?: Array<{
+    organization: {
+      status: string
+    }
+  }>
   activeMembership?: unknown
   hasMultipleActiveMemberships?: boolean
   requiresOrganizationSelection?: boolean
@@ -27,8 +32,11 @@ export const getAuthRedirectTarget = createServerFn({ method: 'GET' }).handler(a
   }
 
   const session = (await response.json()) as AuthRedirectSession
+  const activeMembershipCount = session.memberships?.filter((membership) => {
+    return membership.organization.status === 'active'
+  }).length ?? 0
 
-  if (session.requiresOrganizationSelection || session.hasMultipleActiveMemberships) {
+  if (session.requiresOrganizationSelection || session.hasMultipleActiveMemberships || activeMembershipCount > 1) {
     return '/choose-organization'
   }
 

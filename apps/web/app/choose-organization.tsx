@@ -17,7 +17,11 @@ export const Route = createFileRoute('/choose-organization')({
       throw redirect({ to: '/dashboard' })
     }
 
-    if (session.activeMembership && !session.requiresOrganizationSelection && !session.hasMultipleActiveMemberships) {
+    const activeMembershipCount = session.memberships.filter((membership) => {
+      return membership.organization.status === 'active'
+    }).length
+
+    if (session.activeMembership && !session.requiresOrganizationSelection && !session.hasMultipleActiveMemberships && activeMembershipCount <= 1) {
       throw redirect({ to: '/dashboard' })
     }
 
