@@ -142,7 +142,7 @@ export const screens: Record<DashboardSection, ScreenConfig> = {
     label: 'Classes',
     description: 'Manage class groups, schedules, and course groupings.',
     icon: BookOpen,
-    allowedRoles: ['owner', 'admin', 'teacher'],
+    allowedRoles: ['owner', 'admin', 'teacher', 'student'],
   },
   attendance: {
     section: 'attendance',

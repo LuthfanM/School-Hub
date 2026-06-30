@@ -13,6 +13,7 @@ import {
   screens,
 } from '../../lib/role-access'
 import { useDashboardRole } from '../../lib/role-context'
+import { ClassesScreen } from '../../components/dashboard/classes-screen'
 import { PlatformSettingsScreen, PlatformTenantsScreen } from '../../components/dashboard/platform-screens'
 import { OrganizationAdminsScreen, OrganizationStudentsScreen, OrganizationTeachersScreen } from '../../components/dashboard/organization-directory-screens'
 import { colors, dashboardColors } from '../../styles/colors'
@@ -34,6 +35,7 @@ function DashboardSectionPage() {
   const isStudents = normalizedSection === 'students'
   const isAdmins = normalizedSection === 'admins'
   const isTeachers = normalizedSection === 'teachers'
+  const isClasses = normalizedSection === 'classes'
 
   return (
     <main className={`min-h-full w-full p-4 sm:p-8 ${dashboardColors.page}`}>
@@ -53,8 +55,9 @@ function DashboardSectionPage() {
         {hasAccess && isStudents ? <OrganizationStudentsScreen organization={activeOrganization} /> : null}
         {hasAccess && isAdmins ? <OrganizationAdminsScreen organization={activeOrganization} /> : null}
         {hasAccess && isTeachers ? <OrganizationTeachersScreen organization={activeOrganization} /> : null}
+        {hasAccess && isClasses ? <ClassesScreen organization={activeOrganization} /> : null}
         {hasAccess ? (
-        !isPlatformTenants && !isPlatformSettings && !isStudents && !isAdmins && !isTeachers ? (
+        !isPlatformTenants && !isPlatformSettings && !isStudents && !isAdmins && !isTeachers && !isClasses ? (
         <Card className={`rounded-[28px] ${dashboardColors.card}`}>
           <CardContent className="p-6 sm:p-8">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
@@ -69,7 +72,7 @@ function DashboardSectionPage() {
               <Button asChild variant="secondary">
                 <Link to="/dashboard/$section" params={{ section: 'reports' }}><Filter className="h-4 w-4" /> Filter</Link>
               </Button>
-              {normalizedSection === 'classes' || normalizedSection === 'assignments' ? (
+              {normalizedSection === 'assignments' ? (
                 <Button asChild>
                   <Link to="/demo">
                   <Plus className="h-4 w-4" />

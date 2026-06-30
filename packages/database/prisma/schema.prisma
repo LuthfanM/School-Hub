@@ -101,6 +101,7 @@ model Organization {
   members           Member[]
   invitations       Invitation[]
   students          Student[]
+  schoolClasses     SchoolClass[]
   courses           Course[]
   lessons           Lesson[]
   courseEnrollments CourseEnrollment[]
@@ -121,6 +122,8 @@ model Member {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   permissions  MemberPermission[]
+  homeroomClasses SchoolClass[] @relation("ClassHomeroomTeacher")
+  subjectClasses  ClassSubject[]
 
   @@unique([organizationId, userId])
   @@index([organizationId])
@@ -183,6 +186,7 @@ model Student {
 
   organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  classMemberships ClassStudent[]
   enrollments  CourseEnrollment[]
   progress     LessonProgress[]
 
@@ -191,6 +195,68 @@ model Student {
   @@index([userId])
   @@index([status])
   @@map("students")
+}
+
+model SchoolClass {
+  id                String   @id @default(cuid())
+  organizationId    String
+  name              String   @db.VarChar(255)
+  code              String   @db.VarChar(80)
+  academicYear      String   @db.VarChar(32)
+  capacity          Int      @default(30)
+  status            String   @default("active") // active, archived
+  homeroomTeacherId String?
+  announcement      String?  @db.Text
+  averageScore      Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  homeroomTeacher Member?      @relation("ClassHomeroomTeacher", fields: [homeroomTeacherId], references: [id], onDelete: SetNull)
+  students        ClassStudent[]
+  subjects        ClassSubject[]
+
+  @@unique([organizationId, code, academicYear])
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([homeroomTeacherId])
+  @@map("classes")
+}
+
+model ClassStudent {
+  id        String   @id @default(cuid())
+  classId   String
+  studentId String
+  status    String   @default("active") // active, transferred, dropped
+  joinedAt  DateTime @default(now())
+
+  class   SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, studentId])
+  @@index([classId])
+  @@index([studentId])
+  @@index([status])
+  @@map("class_students")
+}
+
+model ClassSubject {
+  id              String   @id @default(cuid())
+  classId         String
+  teacherMemberId String?
+  subjectName     String   @db.VarChar(255)
+  room            String?  @db.VarChar(80)
+  dayOfWeek       String?  @db.VarChar(16)
+  startTime       String?  @db.VarChar(8)
+  endTime         String?  @db.VarChar(8)
+  createdAt       DateTime @default(now())
+
+  class         SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacherMember Member?     @relation(fields: [teacherMemberId], references: [id], onDelete: SetNull)
+
+  @@index([classId])
+  @@index([teacherMemberId])
+  @@map("class_subjects")
 }
 
 model Course {

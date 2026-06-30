@@ -2,6 +2,15 @@ import { Hono } from 'hono'
 
 import { getPagination } from '../lib/pagination.js'
 import {
+  ClassNotFoundError,
+  ClassProvisioningError,
+  createOrganizationClass,
+  deleteOrganizationClass,
+  getOrganizationClassDetail,
+  listOrganizationClasses,
+  updateOrganizationClass,
+} from '../services/organization-class.service.js'
+import {
   ADMIN_DASHBOARD_RESOURCES,
   AdminNotFoundError,
   AdminProvisioningError,
@@ -248,6 +257,243 @@ organizationRoutes.post('/:organizationId/students', async (c) => {
   } catch (error) {
     if (error instanceof DirectoryProvisioningError) {
       return c.json({ error: error.message }, 400)
+    }
+
+    throw error
+  }
+})
+
+organizationRoutes.get('/:organizationId/classes', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.req.param('organizationId')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const membership = await getOrganizationMembership(user.id, organizationId)
+
+  if (
+    !hasRole(membership, ['owner', 'teacher', 'student']) &&
+    !canReadDashboardResource(membership, 'classes')
+  ) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  if (!membership) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  const result = await listOrganizationClasses({
+    membership,
+    pagination: getPagination(c.req.query('page'), c.req.query('limit')),
+    search: c.req.query('search')?.trim(),
+  })
+
+  return c.json(result)
+})
+
+organizationRoutes.get('/:organizationId/classes/:classId', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.req.param('organizationId')
+  const classId = c.req.param('classId')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const membership = await getOrganizationMembership(user.id, organizationId)
+
+  if (
+    !hasRole(membership, ['owner', 'teacher', 'student']) &&
+    !canReadDashboardResource(membership, 'classes')
+  ) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  if (!membership) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  try {
+    const schoolClass = await getOrganizationClassDetail({
+      classId,
+      membership,
+    })
+
+    return c.json({ class: schoolClass })
+  } catch (error) {
+    if (error instanceof ClassNotFoundError) {
+      return c.json({ error: error.message }, 404)
+    }
+
+    throw error
+  }
+})
+
+organizationRoutes.post('/:organizationId/classes', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.req.param('organizationId')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const membership = await getOrganizationMembership(user.id, organizationId)
+
+  if (!canManageDashboardResource(membership, 'classes')) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  const body = await c.req.json().catch(() => null)
+  const name = typeof body?.name === 'string' ? body.name.trim() : ''
+  const code = typeof body?.code === 'string' ? body.code.trim() : ''
+  const academicYear = typeof body?.academicYear === 'string' ? body.academicYear.trim() : ''
+  const capacity = Number(body?.capacity ?? 30)
+  const homeroomTeacherId =
+    typeof body?.homeroomTeacherId === 'string' && body.homeroomTeacherId.trim()
+      ? body.homeroomTeacherId.trim()
+      : null
+  const announcement =
+    typeof body?.announcement === 'string' && body.announcement.trim()
+      ? body.announcement.trim()
+      : null
+
+  if (!name) {
+    return c.json({ error: 'Class name is required.' }, 400)
+  }
+
+  if (!code) {
+    return c.json({ error: 'Class code is required.' }, 400)
+  }
+
+  if (!academicYear) {
+    return c.json({ error: 'Academic year is required.' }, 400)
+  }
+
+  if (!Number.isInteger(capacity) || capacity < 1 || capacity > 200) {
+    return c.json({ error: 'Class capacity must be between 1 and 200.' }, 400)
+  }
+
+  try {
+    const schoolClass = await createOrganizationClass({
+      organizationId,
+      name,
+      code,
+      academicYear,
+      capacity,
+      homeroomTeacherId,
+      announcement,
+    })
+
+    return c.json({ class: schoolClass }, 201)
+  } catch (error) {
+    if (error instanceof ClassProvisioningError) {
+      return c.json({ error: error.message }, 400)
+    }
+
+    throw error
+  }
+})
+
+organizationRoutes.patch('/:organizationId/classes/:classId', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.req.param('organizationId')
+  const classId = c.req.param('classId')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const membership = await getOrganizationMembership(user.id, organizationId)
+
+  if (!canManageDashboardResource(membership, 'classes')) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  const body = await c.req.json().catch(() => null)
+  const name = typeof body?.name === 'string' ? body.name.trim() : ''
+  const code = typeof body?.code === 'string' ? body.code.trim() : ''
+  const academicYear = typeof body?.academicYear === 'string' ? body.academicYear.trim() : ''
+  const capacity = Number(body?.capacity ?? 30)
+  const status = body?.status === 'archived' ? 'archived' : 'active'
+  const homeroomTeacherId =
+    typeof body?.homeroomTeacherId === 'string' && body.homeroomTeacherId.trim()
+      ? body.homeroomTeacherId.trim()
+      : null
+  const announcement =
+    typeof body?.announcement === 'string' && body.announcement.trim()
+      ? body.announcement.trim()
+      : null
+
+  if (!name) {
+    return c.json({ error: 'Class name is required.' }, 400)
+  }
+
+  if (!code) {
+    return c.json({ error: 'Class code is required.' }, 400)
+  }
+
+  if (!academicYear) {
+    return c.json({ error: 'Academic year is required.' }, 400)
+  }
+
+  if (!Number.isInteger(capacity) || capacity < 1 || capacity > 200) {
+    return c.json({ error: 'Class capacity must be between 1 and 200.' }, 400)
+  }
+
+  try {
+    const schoolClass = await updateOrganizationClass({
+      classId,
+      organizationId,
+      name,
+      code,
+      academicYear,
+      capacity,
+      status,
+      homeroomTeacherId,
+      announcement,
+    })
+
+    return c.json({ class: schoolClass })
+  } catch (error) {
+    if (error instanceof ClassProvisioningError) {
+      return c.json({ error: error.message }, 400)
+    }
+
+    if (error instanceof ClassNotFoundError) {
+      return c.json({ error: error.message }, 404)
+    }
+
+    throw error
+  }
+})
+
+organizationRoutes.delete('/:organizationId/classes/:classId', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.req.param('organizationId')
+  const classId = c.req.param('classId')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const membership = await getOrganizationMembership(user.id, organizationId)
+
+  if (!canManageDashboardResource(membership, 'classes')) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  try {
+    await deleteOrganizationClass({
+      classId,
+      organizationId,
+    })
+
+    return c.json({ success: true })
+  } catch (error) {
+    if (error instanceof ClassNotFoundError) {
+      return c.json({ error: error.message }, 404)
     }
 
     throw error
