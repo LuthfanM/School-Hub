@@ -15,6 +15,10 @@ export const Route = createFileRoute('/auth/login')({
       throw redirect({ to: '/dashboard' })
     }
 
+    if (redirectTarget === '/choose-organization') {
+      throw redirect({ to: '/choose-organization' })
+    }
+
     return null
   },
   component: LoginPage,
@@ -55,6 +59,8 @@ function LoginPage() {
       user: {
         platformRole?: string | null
       }
+      hasMultipleActiveMemberships?: boolean
+      requiresOrganizationSelection?: boolean
       activeMembership?: {
         organization: {
           status: string
@@ -62,7 +68,7 @@ function LoginPage() {
       } | null
     }>('/api/session').catch(() => null)
 
-    if (!session?.activeMembership && session?.user.platformRole !== 'platform_admin') {
+    if (!session?.activeMembership && !session?.requiresOrganizationSelection && session?.user.platformRole !== 'platform_admin') {
       await signOut()
       setError('No active organization workspace is available for this account.')
       setIsSubmitting(false)
@@ -70,6 +76,11 @@ function LoginPage() {
     }
 
     setIsSubmitting(false)
+    if (session.requiresOrganizationSelection || session.hasMultipleActiveMemberships) {
+      await navigate({ to: '/choose-organization' })
+      return
+    }
+
     await navigate({ to: '/dashboard' })
   }
 

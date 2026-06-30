@@ -6,6 +6,8 @@ interface AuthRedirectSession {
     platformRole?: string | null
   }
   activeMembership?: unknown
+  hasMultipleActiveMemberships?: boolean
+  requiresOrganizationSelection?: boolean
 }
 
 export const getAuthRedirectTarget = createServerFn({ method: 'GET' }).handler(async () => {
@@ -25,6 +27,10 @@ export const getAuthRedirectTarget = createServerFn({ method: 'GET' }).handler(a
   }
 
   const session = (await response.json()) as AuthRedirectSession
+
+  if (session.requiresOrganizationSelection || session.hasMultipleActiveMemberships) {
+    return '/choose-organization'
+  }
 
   if (session.user.platformRole === 'platform_admin' || session.activeMembership) {
     return '/dashboard'

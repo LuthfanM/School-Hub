@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './app/__root'
 import { Route as DemoRouteImport } from './app/demo'
 import { Route as DashboardRouteImport } from './app/dashboard'
+import { Route as ChooseOrganizationRouteImport } from './app/choose-organization'
 import { Route as IndexRouteImport } from './app/index'
 import { Route as DashboardSectionRouteImport } from './app/dashboard/$section'
 import { Route as AuthRegisterRouteImport } from './app/auth/register'
@@ -26,6 +27,11 @@ const DemoRoute = DemoRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChooseOrganizationRoute = ChooseOrganizationRouteImport.update({
+  id: '/choose-organization',
+  path: '/choose-organization',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -62,6 +68,7 @@ const DashboardStudentsNewRoute = DashboardStudentsNewRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/choose-organization': typeof ChooseOrganizationRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/demo': typeof DemoRoute
   '/auth/login': typeof AuthLoginRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/choose-organization': typeof ChooseOrganizationRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/demo': typeof DemoRoute
   '/auth/login': typeof AuthLoginRoute
@@ -83,6 +91,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/choose-organization': typeof ChooseOrganizationRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/demo': typeof DemoRoute
   '/auth/login': typeof AuthLoginRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/choose-organization'
     | '/dashboard'
     | '/demo'
     | '/auth/login'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/choose-organization'
     | '/dashboard'
     | '/demo'
     | '/auth/login'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/choose-organization'
     | '/dashboard'
     | '/demo'
     | '/auth/login'
@@ -126,6 +138,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ChooseOrganizationRoute: typeof ChooseOrganizationRoute
   DashboardRoute: typeof DashboardRouteWithChildren
   DemoRoute: typeof DemoRoute
   AuthLoginRoute: typeof AuthLoginRoute
@@ -146,6 +159,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/choose-organization': {
+      id: '/choose-organization'
+      path: '/choose-organization'
+      fullPath: '/choose-organization'
+      preLoaderRoute: typeof ChooseOrganizationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -211,6 +231,7 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ChooseOrganizationRoute: ChooseOrganizationRoute,
   DashboardRoute: DashboardRouteWithChildren,
   DemoRoute: DemoRoute,
   AuthLoginRoute: AuthLoginRoute,

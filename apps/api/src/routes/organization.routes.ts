@@ -4,10 +4,13 @@ import { getPagination } from '../lib/pagination.js'
 import {
   ClassNotFoundError,
   ClassProvisioningError,
+  createClassAnnouncement,
   createOrganizationClass,
+  deleteClassAnnouncement,
   deleteOrganizationClass,
   getOrganizationClassDetail,
   listOrganizationClasses,
+  updateClassAnnouncement,
   updateOrganizationClass,
 } from '../services/organization-class.service.js'
 import {
@@ -21,9 +24,12 @@ import {
   type AdminDashboardResource,
 } from '../services/organization-admin.service.js'
 import {
+  DirectoryRecordNotFoundError,
   DirectoryProvisioningError,
   createStudent,
   createTeacher,
+  deleteStudent,
+  deleteTeacher,
   listStudents,
   listTeachers,
 } from '../services/organization-directory.service.js'
@@ -202,7 +208,11 @@ organizationRoutes.get('/:organizationId/students', async (c) => {
 
   const membership = await getOrganizationMembership(user.id, organizationId)
 
-  if (!hasRole(membership, ['owner', 'teacher']) && !canReadDashboardResource(membership, 'students')) {
+  if (
+    user.platformRole !== 'platform_admin' &&
+    !hasRole(membership, ['owner', 'teacher']) &&
+    !canReadDashboardResource(membership, 'students')
+  ) {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
@@ -257,6 +267,37 @@ organizationRoutes.post('/:organizationId/students', async (c) => {
   } catch (error) {
     if (error instanceof DirectoryProvisioningError) {
       return c.json({ error: error.message }, 400)
+    }
+
+    throw error
+  }
+})
+
+organizationRoutes.delete('/:organizationId/students/:studentId', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.req.param('organizationId')
+  const studentId = c.req.param('studentId')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const membership = await getOrganizationMembership(user.id, organizationId)
+
+  if (user.platformRole !== 'platform_admin' && !canManageDashboardResource(membership, 'students')) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  try {
+    await deleteStudent({
+      organizationId,
+      studentId,
+    })
+
+    return c.json({ success: true })
+  } catch (error) {
+    if (error instanceof DirectoryRecordNotFoundError) {
+      return c.json({ error: error.message }, 404)
     }
 
     throw error
@@ -354,10 +395,6 @@ organizationRoutes.post('/:organizationId/classes', async (c) => {
     typeof body?.homeroomTeacherId === 'string' && body.homeroomTeacherId.trim()
       ? body.homeroomTeacherId.trim()
       : null
-  const announcement =
-    typeof body?.announcement === 'string' && body.announcement.trim()
-      ? body.announcement.trim()
-      : null
 
   if (!name) {
     return c.json({ error: 'Class name is required.' }, 400)
@@ -383,7 +420,6 @@ organizationRoutes.post('/:organizationId/classes', async (c) => {
       academicYear,
       capacity,
       homeroomTeacherId,
-      announcement,
     })
 
     return c.json({ class: schoolClass }, 201)
@@ -421,10 +457,6 @@ organizationRoutes.patch('/:organizationId/classes/:classId', async (c) => {
     typeof body?.homeroomTeacherId === 'string' && body.homeroomTeacherId.trim()
       ? body.homeroomTeacherId.trim()
       : null
-  const announcement =
-    typeof body?.announcement === 'string' && body.announcement.trim()
-      ? body.announcement.trim()
-      : null
 
   if (!name) {
     return c.json({ error: 'Class name is required.' }, 400)
@@ -452,7 +484,6 @@ organizationRoutes.patch('/:organizationId/classes/:classId', async (c) => {
       capacity,
       status,
       homeroomTeacherId,
-      announcement,
     })
 
     return c.json({ class: schoolClass })
@@ -500,6 +531,144 @@ organizationRoutes.delete('/:organizationId/classes/:classId', async (c) => {
   }
 })
 
+organizationRoutes.post('/:organizationId/classes/:classId/announcements', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.req.param('organizationId')
+  const classId = c.req.param('classId')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const membership = await getOrganizationMembership(user.id, organizationId)
+
+  if (!hasRole(membership, ['owner', 'teacher']) && !canManageDashboardResource(membership, 'classes')) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  if (!membership) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  const body = await c.req.json().catch(() => null)
+  const title = typeof body?.title === 'string' ? body.title.trim() : ''
+  const announcementBody = typeof body?.body === 'string' ? body.body.trim() : ''
+
+  if (!title) {
+    return c.json({ error: 'Announcement title is required.' }, 400)
+  }
+
+  if (!announcementBody) {
+    return c.json({ error: 'Announcement body is required.' }, 400)
+  }
+
+  try {
+    const announcement = await createClassAnnouncement({
+      body: announcementBody,
+      classId,
+      membership,
+      title,
+      userId: user.id,
+    })
+
+    return c.json({ announcement }, 201)
+  } catch (error) {
+    if (error instanceof ClassNotFoundError) {
+      return c.json({ error: error.message }, 404)
+    }
+
+    throw error
+  }
+})
+
+organizationRoutes.patch('/:organizationId/classes/:classId/announcements/:announcementId', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.req.param('organizationId')
+  const classId = c.req.param('classId')
+  const announcementId = c.req.param('announcementId')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const membership = await getOrganizationMembership(user.id, organizationId)
+
+  if (!hasRole(membership, ['owner', 'teacher']) && !canManageDashboardResource(membership, 'classes')) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  if (!membership) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  const body = await c.req.json().catch(() => null)
+  const title = typeof body?.title === 'string' ? body.title.trim() : ''
+  const announcementBody = typeof body?.body === 'string' ? body.body.trim() : ''
+
+  if (!title) {
+    return c.json({ error: 'Announcement title is required.' }, 400)
+  }
+
+  if (!announcementBody) {
+    return c.json({ error: 'Announcement body is required.' }, 400)
+  }
+
+  try {
+    const announcement = await updateClassAnnouncement({
+      announcementId,
+      body: announcementBody,
+      classId,
+      membership,
+      title,
+    })
+
+    return c.json({ announcement })
+  } catch (error) {
+    if (error instanceof ClassNotFoundError) {
+      return c.json({ error: error.message }, 404)
+    }
+
+    throw error
+  }
+})
+
+organizationRoutes.delete('/:organizationId/classes/:classId/announcements/:announcementId', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.req.param('organizationId')
+  const classId = c.req.param('classId')
+  const announcementId = c.req.param('announcementId')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const membership = await getOrganizationMembership(user.id, organizationId)
+
+  if (!hasRole(membership, ['owner', 'teacher']) && !canManageDashboardResource(membership, 'classes')) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  if (!membership) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  try {
+    await deleteClassAnnouncement({
+      announcementId,
+      classId,
+      membership,
+    })
+
+    return c.json({ success: true })
+  } catch (error) {
+    if (error instanceof ClassNotFoundError) {
+      return c.json({ error: error.message }, 404)
+    }
+
+    throw error
+  }
+})
+
 function parseAdminPermissions(value: unknown): AdminDashboardResource[] {
   if (!Array.isArray(value)) return []
 
@@ -518,12 +687,17 @@ organizationRoutes.get('/:organizationId/teachers', async (c) => {
 
   const membership = await getOrganizationMembership(user.id, organizationId)
 
-  if (!hasRole(membership, ['owner']) && !canReadDashboardResource(membership, 'teachers')) {
+  if (
+    user.platformRole !== 'platform_admin' &&
+    !hasRole(membership, ['owner']) &&
+    !canReadDashboardResource(membership, 'teachers')
+  ) {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
   const result = await listTeachers({
     organizationId,
+    emailStatus: c.req.query('emailStatus')?.trim(),
     pagination: getPagination(c.req.query('page'), c.req.query('limit')),
     search: c.req.query('search')?.trim(),
   })
@@ -577,6 +751,37 @@ organizationRoutes.post('/:organizationId/teachers', async (c) => {
   } catch (error) {
     if (error instanceof DirectoryProvisioningError) {
       return c.json({ error: error.message }, 400)
+    }
+
+    throw error
+  }
+})
+
+organizationRoutes.delete('/:organizationId/teachers/:teacherId', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.req.param('organizationId')
+  const teacherId = c.req.param('teacherId')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const membership = await getOrganizationMembership(user.id, organizationId)
+
+  if (user.platformRole !== 'platform_admin' && !canManageDashboardResource(membership, 'teachers')) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  try {
+    await deleteTeacher({
+      organizationId,
+      teacherId,
+    })
+
+    return c.json({ success: true })
+  } catch (error) {
+    if (error instanceof DirectoryRecordNotFoundError) {
+      return c.json({ error: error.message }, 404)
     }
 
     throw error

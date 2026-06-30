@@ -18,12 +18,33 @@ export interface CreateClassInput {
   academicYear: string
   capacity: number
   homeroomTeacherId: string | null
-  announcement: string | null
 }
 
 export interface UpdateClassInput extends CreateClassInput {
   classId: string
   status: string
+}
+
+export interface CreateClassAnnouncementInput {
+  body: string
+  classId: string
+  membership: ClassMembershipScope
+  title: string
+  userId: string
+}
+
+export interface UpdateClassAnnouncementInput {
+  announcementId: string
+  body: string
+  classId: string
+  membership: ClassMembershipScope
+  title: string
+}
+
+export interface DeleteClassAnnouncementInput {
+  announcementId: string
+  classId: string
+  membership: ClassMembershipScope
 }
 
 export async function listOrganizationClasses({
@@ -83,8 +104,23 @@ export async function getOrganizationClassDetail({
     },
     select: {
       ...classSummarySelect,
-      announcement: true,
       averageScore: true,
+      announcements: {
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: {
+          id: true,
+          title: true,
+          body: true,
+          createdAt: true,
+          createdByUser: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
+        },
+      },
       students: {
         orderBy: { student: { fullName: 'asc' } },
         select: {
@@ -132,8 +168,14 @@ export async function getOrganizationClassDetail({
 
   return {
     ...serializeClassSummary(schoolClass),
-    announcement: schoolClass.announcement,
     averageScore: schoolClass.averageScore,
+    announcements: schoolClass.announcements.map((announcement) => ({
+      id: announcement.id,
+      title: announcement.title,
+      body: announcement.body,
+      createdAt: announcement.createdAt.toISOString(),
+      createdBy: announcement.createdByUser,
+    })),
     roster: schoolClass.students.map((classStudent) => ({
       id: classStudent.id,
       status: classStudent.status,
@@ -206,7 +248,6 @@ export async function updateOrganizationClass(input: UpdateClassInput) {
         capacity: input.capacity,
         status: input.status,
         homeroomTeacherId: input.homeroomTeacherId,
-        announcement: input.announcement,
       },
       select: classSummarySelect,
     })
@@ -219,6 +260,101 @@ export async function updateOrganizationClass(input: UpdateClassInput) {
 
     if (isKnownRequestError(error) && error.code === 'P2025') {
       throw new ClassNotFoundError('Class was not found in this organization.')
+    }
+
+    throw error
+  }
+}
+
+export async function createClassAnnouncement(input: CreateClassAnnouncementInput) {
+  await assertClassVisible(input.membership, input.classId)
+
+  const announcement = await prisma.classAnnouncement.create({
+    data: {
+      classId: input.classId,
+      title: input.title,
+      body: input.body,
+      createdBy: input.userId,
+    },
+    select: {
+      id: true,
+      title: true,
+      body: true,
+      createdAt: true,
+      createdByUser: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
+    },
+  })
+
+  return {
+    id: announcement.id,
+    title: announcement.title,
+    body: announcement.body,
+    createdAt: announcement.createdAt.toISOString(),
+    createdBy: announcement.createdByUser,
+  }
+}
+
+export async function updateClassAnnouncement(input: UpdateClassAnnouncementInput) {
+  await assertClassVisible(input.membership, input.classId)
+
+  try {
+    const announcement = await prisma.classAnnouncement.update({
+      where: {
+        id: input.announcementId,
+        classId: input.classId,
+      },
+      data: {
+        title: input.title,
+        body: input.body,
+      },
+      select: {
+        id: true,
+        title: true,
+        body: true,
+        createdAt: true,
+        createdByUser: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+    })
+
+    return {
+      id: announcement.id,
+      title: announcement.title,
+      body: announcement.body,
+      createdAt: announcement.createdAt.toISOString(),
+      createdBy: announcement.createdByUser,
+    }
+  } catch (error) {
+    if (isKnownRequestError(error) && error.code === 'P2025') {
+      throw new ClassNotFoundError('Announcement was not found in this class.')
+    }
+
+    throw error
+  }
+}
+
+export async function deleteClassAnnouncement(input: DeleteClassAnnouncementInput) {
+  await assertClassVisible(input.membership, input.classId)
+
+  try {
+    await prisma.classAnnouncement.delete({
+      where: {
+        id: input.announcementId,
+        classId: input.classId,
+      },
+    })
+  } catch (error) {
+    if (isKnownRequestError(error) && error.code === 'P2025') {
+      throw new ClassNotFoundError('Announcement was not found in this class.')
     }
 
     throw error
@@ -262,6 +398,21 @@ async function assertTeacherBelongsToOrganization(organizationId: string, teache
 
   if (!teacher) {
     throw new ClassProvisioningError('Homeroom teacher was not found in this organization.')
+  }
+}
+
+async function assertClassVisible(membership: ClassMembershipScope, classId: string) {
+  const classWhere = await getClassVisibilityWhere(membership)
+  const schoolClass = await prisma.schoolClass.findFirst({
+    where: {
+      ...classWhere,
+      id: classId,
+    },
+    select: { id: true },
+  })
+
+  if (!schoolClass) {
+    throw new ClassNotFoundError('Class was not found in this organization.')
   }
 }
 

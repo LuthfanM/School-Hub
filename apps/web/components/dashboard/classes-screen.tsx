@@ -29,6 +29,7 @@ import {
   Megaphone,
   Plus,
   Search,
+  Trash2,
   Upload,
   UserCheck,
   Users,
@@ -70,8 +71,17 @@ interface ClassSummary {
 }
 
 interface ClassDetail extends ClassSummary {
-  announcement: string | null
   averageScore: number | null
+  announcements: Array<{
+    id: string
+    title: string
+    body: string
+    createdAt: string
+    createdBy: {
+      name: string
+      email: string
+    }
+  }>
   roster: Array<{
     id: string
     status: string
@@ -115,6 +125,10 @@ interface ClassDetailResponse {
   class: ClassDetail
 }
 
+interface CreateClassAnnouncementResponse {
+  announcement: ClassDetail['announcements'][number]
+}
+
 const emptyClassForm = {
   name: '',
   code: '',
@@ -122,7 +136,11 @@ const emptyClassForm = {
   capacity: '30',
   homeroomTeacherId: 'none',
   status: 'active',
-  announcement: '',
+}
+
+const emptyAnnouncementForm = {
+  title: '',
+  body: '',
 }
 
 export function ClassesScreen({ organization }: { organization: ActiveOrganization | null }) {
@@ -153,6 +171,13 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
   const [isDeleting, setIsDeleting] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const [editForm, setEditForm] = useState(emptyClassForm)
+  const [isAnnouncementOpen, setIsAnnouncementOpen] = useState(false)
+  const [announcementMode, setAnnouncementMode] = useState<'create' | 'edit'>('create')
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null)
+  const [isCreatingAnnouncement, setIsCreatingAnnouncement] = useState(false)
+  const [deletingAnnouncementId, setDeletingAnnouncementId] = useState<string | null>(null)
+  const [announcementError, setAnnouncementError] = useState<string | null>(null)
+  const [announcementForm, setAnnouncementForm] = useState(emptyAnnouncementForm)
   const [teacherOptions, setTeacherOptions] = useState<TeacherOption[]>([])
   const canManageClasses = role === 'owner' || role === 'admin'
   const canTakeAttendance = role === 'owner' || role === 'admin' || role === 'teacher'
@@ -260,7 +285,6 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
           academicYear: createForm.academicYear,
           capacity: Number(createForm.capacity),
           homeroomTeacherId: createForm.homeroomTeacherId === 'none' ? undefined : createForm.homeroomTeacherId,
-          announcement: createForm.announcement || undefined,
         }),
       })
 
@@ -294,7 +318,6 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
       capacity: String(schoolClass.capacity),
       homeroomTeacherId: schoolClass.homeroomTeacher?.id ?? 'none',
       status: schoolClass.status,
-      announcement: schoolClass.announcement ?? '',
     })
     setEditError(null)
     setIsEditOpen(true)
@@ -325,7 +348,6 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
           capacity: Number(editForm.capacity),
           status: editForm.status,
           homeroomTeacherId: editForm.homeroomTeacherId === 'none' ? undefined : editForm.homeroomTeacherId,
-          announcement: editForm.announcement || undefined,
         }),
       })
 
@@ -336,7 +358,6 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
         ? {
             ...currentDetail,
             ...response.class,
-            announcement: editForm.announcement || null,
           }
         : currentDetail)
       setIsEditOpen(false)
@@ -372,6 +393,95 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
     }
   }
 
+  async function submitAnnouncement(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!organization || !classDetail) return
+
+    setIsCreatingAnnouncement(true)
+    setAnnouncementError(null)
+
+    try {
+      const isEdit = announcementMode === 'edit' && editingAnnouncementId
+      const response = await apiRequest<CreateClassAnnouncementResponse>(`/api/organizations/${organization.id}/classes/${classDetail.id}/announcements${isEdit ? `/${editingAnnouncementId}` : ''}`, {
+        method: isEdit ? 'PATCH' : 'POST',
+        body: JSON.stringify({
+          title: announcementForm.title,
+          body: announcementForm.body,
+        }),
+      })
+
+      setClassDetail((currentDetail) => currentDetail
+        ? {
+            ...currentDetail,
+            announcements: isEdit
+              ? currentDetail.announcements.map((announcement) => {
+                  return announcement.id === response.announcement.id ? response.announcement : announcement
+                })
+              : [response.announcement, ...currentDetail.announcements],
+          }
+        : currentDetail)
+      setAnnouncementForm(emptyAnnouncementForm)
+      setAnnouncementMode('create')
+      setEditingAnnouncementId(null)
+      setIsAnnouncementOpen(false)
+    } catch (requestError) {
+      setAnnouncementError(requestError instanceof Error ? requestError.message : `Failed to ${announcementMode === 'edit' ? 'update' : 'create'} announcement.`)
+    } finally {
+      setIsCreatingAnnouncement(false)
+    }
+  }
+
+  async function deleteAnnouncement(announcementId: string) {
+    if (!organization || !classDetail) return
+
+    setDeletingAnnouncementId(announcementId)
+    setDetailError(null)
+
+    try {
+      await apiRequest<{ success: boolean }>(`/api/organizations/${organization.id}/classes/${classDetail.id}/announcements/${announcementId}`, {
+        method: 'DELETE',
+      })
+
+      setClassDetail((currentDetail) => currentDetail
+        ? {
+            ...currentDetail,
+            announcements: currentDetail.announcements.filter((announcement) => announcement.id !== announcementId),
+          }
+        : currentDetail)
+    } catch (requestError) {
+      setDetailError(requestError instanceof Error ? requestError.message : 'Failed to delete announcement.')
+    } finally {
+      setDeletingAnnouncementId(null)
+    }
+  }
+
+  function openCreateAnnouncementDialog() {
+    setAnnouncementMode('create')
+    setEditingAnnouncementId(null)
+    setAnnouncementForm(emptyAnnouncementForm)
+    setAnnouncementError(null)
+    setIsAnnouncementOpen(true)
+  }
+
+  function openEditAnnouncementDialog(announcement: ClassDetail['announcements'][number]) {
+    setAnnouncementMode('edit')
+    setEditingAnnouncementId(announcement.id)
+    setAnnouncementForm({
+      title: announcement.title,
+      body: announcement.body,
+    })
+    setAnnouncementError(null)
+    setIsAnnouncementOpen(true)
+  }
+
+  function updateAnnouncementForm(key: keyof typeof emptyAnnouncementForm, value: string) {
+    setAnnouncementForm((currentForm) => ({
+      ...currentForm,
+      [key]: value,
+    }))
+    setAnnouncementError(null)
+  }
+
   if (!organization) {
     return (
       <Card className={`rounded-[28px] ${dashboardColors.card}`}>
@@ -390,6 +500,8 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
     return (
       <>
         <ClassDetailView
+          canCreateAnnouncement={canManageClasses || role === 'teacher'}
+          deletingAnnouncementId={deletingAnnouncementId}
           canManageClasses={canManageClasses}
           canTakeAttendance={canTakeAttendance}
           classDetail={classDetail}
@@ -403,6 +515,19 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
           }}
           onDelete={deleteClass}
           onEdit={openEditDialog}
+          onDeleteAnnouncement={deleteAnnouncement}
+          onEditAnnouncement={openEditAnnouncementDialog}
+          onOpenAnnouncement={openCreateAnnouncementDialog}
+        />
+        <ClassAnnouncementDialog
+          announcementError={announcementError}
+          announcementForm={announcementForm}
+          announcementMode={announcementMode}
+          isAnnouncementOpen={isAnnouncementOpen}
+          isCreatingAnnouncement={isCreatingAnnouncement}
+          onOpenChange={setIsAnnouncementOpen}
+          onSubmit={submitAnnouncement}
+          onUpdateForm={updateAnnouncementForm}
         />
         <ClassEditDialog
           editError={editError}
@@ -609,9 +734,6 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Class announcement">
-              <Input value={createForm.announcement} onChange={(event) => updateCreateForm('announcement', event.target.value)} placeholder="Optional class announcement" />
-            </Field>
 
             {createError ? (
               <div className={`rounded-2xl border p-4 text-sm ${colors.danger.subtleBg} ${colors.app.border}`}>
@@ -646,25 +768,35 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
 }
 
 function ClassDetailView({
+  canCreateAnnouncement,
   canManageClasses,
   canTakeAttendance,
   classDetail,
+  deletingAnnouncementId,
   detailError,
   isDetailLoading,
   isDeleting,
   onBack,
   onDelete,
+  onDeleteAnnouncement,
   onEdit,
+  onEditAnnouncement,
+  onOpenAnnouncement,
 }: {
+  canCreateAnnouncement: boolean
   canManageClasses: boolean
   canTakeAttendance: boolean
   classDetail: ClassDetail | null
+  deletingAnnouncementId: string | null
   detailError: string | null
   isDetailLoading: boolean
   isDeleting: boolean
   onBack: () => void
   onDelete: () => void
+  onDeleteAnnouncement: (announcementId: string) => void
   onEdit: (schoolClass: ClassDetail) => void
+  onEditAnnouncement: (announcement: ClassDetail['announcements'][number]) => void
+  onOpenAnnouncement: () => void
 }) {
   return (
     <div className="w-full space-y-6">
@@ -817,9 +949,49 @@ function ClassDetailView({
               <Card className={`rounded-[24px] ${dashboardColors.card}`}>
                 <CardContent className="grid gap-6 p-6 lg:grid-cols-[1fr_320px]">
                   <div>
-                    <SectionTitle icon={Megaphone} title="Pengumuman Kelas" />
-                    <div className={`mt-5 rounded-2xl border p-5 ${dashboardColors.panel}`}>
-                      <p className={colors.app.muted}>{classDetail.announcement ?? 'No class announcement yet.'}</p>
+                    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                      <SectionTitle icon={Megaphone} title="Pengumuman Kelas" />
+                      {canCreateAnnouncement ? (
+                        <Button type="button" onClick={onOpenAnnouncement}>
+                          <Plus className="h-4 w-4" /> Add Announcement
+                        </Button>
+                      ) : null}
+                    </div>
+                    <div className="mt-5 space-y-3">
+                      {classDetail.announcements.length === 0 ? (
+                        <div className={`rounded-2xl border border-dashed p-5 text-sm ${colors.app.borderDashed} ${colors.app.muted}`}>
+                          No class announcements yet.
+                        </div>
+                      ) : classDetail.announcements.map((announcement) => (
+                        <div key={announcement.id} className={`rounded-2xl border p-5 ${dashboardColors.panel}`}>
+                          <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
+                            <div>
+                              <p className="font-semibold">{announcement.title}</p>
+                              <p className={`mt-1 text-xs ${colors.app.muted}`}>
+                                {announcement.createdBy.name} - {formatDate(announcement.createdAt)}
+                              </p>
+                            </div>
+                            {canCreateAnnouncement ? (
+                              <div className="flex gap-2">
+                                <Button size="sm" type="button" variant="secondary" onClick={() => onEditAnnouncement(announcement)}>
+                                  Edit
+                                </Button>
+                                <Button
+                                  disabled={deletingAnnouncementId === announcement.id}
+                                  size="sm"
+                                  type="button"
+                                  variant="destructive"
+                                  onClick={() => onDeleteAnnouncement(announcement.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  {deletingAnnouncementId === announcement.id ? 'Deleting...' : 'Delete'}
+                                </Button>
+                              </div>
+                            ) : null}
+                          </div>
+                          <p className={`mt-4 text-sm leading-6 ${colors.app.muted}`}>{announcement.body}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                   <div>
@@ -836,6 +1008,66 @@ function ClassDetailView({
         </>
       ) : null}
     </div>
+  )
+}
+
+function ClassAnnouncementDialog({
+  announcementError,
+  announcementForm,
+  announcementMode,
+  isAnnouncementOpen,
+  isCreatingAnnouncement,
+  onOpenChange,
+  onSubmit,
+  onUpdateForm,
+}: {
+  announcementError: string | null
+  announcementForm: typeof emptyAnnouncementForm
+  announcementMode: 'create' | 'edit'
+  isAnnouncementOpen: boolean
+  isCreatingAnnouncement: boolean
+  onOpenChange: (isOpen: boolean) => void
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onUpdateForm: (key: keyof typeof emptyAnnouncementForm, value: string) => void
+}) {
+  return (
+    <Dialog open={isAnnouncementOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{announcementMode === 'edit' ? 'Edit announcement' : 'Add announcement'}</DialogTitle>
+          <DialogDescription>
+            {announcementMode === 'edit'
+              ? 'Fix the announcement title or message.'
+              : 'Publish a class-specific announcement for students, teachers, and admins who can access this class.'}
+          </DialogDescription>
+        </DialogHeader>
+        <form className="space-y-5" onSubmit={onSubmit}>
+          <Field label="Title">
+            <Input required value={announcementForm.title} onChange={(event) => onUpdateForm('title', event.target.value)} placeholder="Ujian Matematika Jumat" />
+          </Field>
+          <Field label="Message">
+            <Input required value={announcementForm.body} onChange={(event) => onUpdateForm('body', event.target.value)} placeholder="Materi: Trigonometri. Mulai jam 08:00." />
+          </Field>
+
+          {announcementError ? (
+            <div className={`rounded-2xl border p-4 text-sm ${colors.danger.subtleBg} ${colors.app.border}`}>
+              {announcementError}
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button disabled={isCreatingAnnouncement} type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button disabled={isCreatingAnnouncement} type="submit">
+              {isCreatingAnnouncement
+                ? announcementMode === 'edit' ? 'Saving...' : 'Publishing...'
+                : announcementMode === 'edit' ? 'Save Announcement' : 'Publish Announcement'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -910,9 +1142,6 @@ function ClassEditDialog({
               </Select>
             </Field>
           </div>
-          <Field label="Class announcement">
-            <Input value={editForm.announcement} onChange={(event) => onUpdateForm('announcement', event.target.value)} />
-          </Field>
 
           {editError ? (
             <div className={`rounded-2xl border p-4 text-sm ${colors.danger.subtleBg} ${colors.app.border}`}>
@@ -982,4 +1211,12 @@ function ClassStatusBadge({ status }: { status: string }) {
 function formatTimeRange(subject: { startTime: string | null; endTime: string | null }) {
   if (!subject.startTime || !subject.endTime) return 'No time'
   return `${subject.startTime}-${subject.endTime}`
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('en', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value))
 }

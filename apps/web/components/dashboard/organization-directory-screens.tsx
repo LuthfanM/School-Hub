@@ -742,9 +742,14 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
   })
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [isLoading, setIsLoading] = useState(Boolean(organization))
   const [error, setError] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -762,6 +767,9 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
   })
   const { role } = useDashboardRole()
   const canCreate = role === 'owner' || role === 'admin'
+  const canDelete = role === 'owner' || role === 'platform_admin' || role === 'admin'
+  const selectedCount = selectedIds.size
+  const allVisibleRowsSelected = rows.length > 0 && rows.every((row) => selectedIds.has(row.id))
   const endpoint = useMemo(() => {
     if (!organization) return null
 
@@ -774,8 +782,16 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
       params.set('search', searchQuery)
     }
 
+    if (kind === 'students' && statusFilter !== 'all') {
+      params.set('status', statusFilter)
+    }
+
+    if (kind === 'teachers' && statusFilter !== 'all') {
+      params.set('emailStatus', statusFilter)
+    }
+
     return `/api/organizations/${organization.id}/${kind}?${params.toString()}`
-  }, [kind, organization, page, searchQuery])
+  }, [kind, organization, page, searchQuery, statusFilter])
 
   useEffect(() => {
     if (!endpoint) return
@@ -788,6 +804,7 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
         if (!isMounted) return
         setRows(response.data)
         setPagination(response.pagination)
+        setSelectedIds(new Set())
         setError(null)
       })
       .catch((requestError: unknown) => {
@@ -806,7 +823,82 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setPage(1)
+    setSelectedIds(new Set())
     setSearchQuery(searchInput.trim())
+  }
+
+  function updateStatusFilter(value: string) {
+    setStatusFilter(value)
+    setSelectedIds(new Set())
+    setPage(1)
+  }
+
+  function toggleRowSelection(rowId: string, checked: boolean) {
+    setSelectedIds((currentIds) => {
+      const nextIds = new Set(currentIds)
+
+      if (checked) {
+        nextIds.add(rowId)
+      } else {
+        nextIds.delete(rowId)
+      }
+
+      return nextIds
+    })
+  }
+
+  function toggleVisibleRows(checked: boolean) {
+    setSelectedIds((currentIds) => {
+      const nextIds = new Set(currentIds)
+
+      rows.forEach((row) => {
+        if (checked) {
+          nextIds.add(row.id)
+        } else {
+          nextIds.delete(row.id)
+        }
+      })
+
+      return nextIds
+    })
+  }
+
+  async function deleteSelectedRows() {
+    if (!organization || selectedIds.size === 0) return
+
+    const idsToDelete = Array.from(selectedIds)
+    setIsDeleting(true)
+    setDeleteError(null)
+
+    try {
+      await Promise.all(idsToDelete.map((id) => {
+        return apiRequest(`/api/organizations/${organization.id}/${kind}/${id}`, {
+          method: 'DELETE',
+        })
+      }))
+
+      setRows((currentRows) => currentRows.filter((row) => !selectedIds.has(row.id)))
+      setSelectedIds(new Set())
+      setPagination((currentPagination) => {
+        const total = Math.max(currentPagination.total - idsToDelete.length, 0)
+        const totalPages = Math.max(Math.ceil(total / currentPagination.limit), 1)
+
+        if (page > totalPages) {
+          setPage(totalPages)
+        }
+
+        return {
+          ...currentPagination,
+          total,
+          totalPages,
+        }
+      })
+      setIsDeleteOpen(false)
+    } catch (requestError) {
+      setDeleteError(requestError instanceof Error ? requestError.message : `Failed to delete selected ${kind}.`)
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   async function submitCreate(event: FormEvent<HTMLFormElement>) {
@@ -907,6 +999,20 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
                 <span className={colors.app.muted}>Total</span>
                 <span className="ml-3 font-mono text-lg font-bold">{pagination.total}</span>
               </div>
+              {canDelete ? (
+                <Button
+                  disabled={selectedCount === 0 || isDeleting}
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    setDeleteError(null)
+                    setIsDeleteOpen(true)
+                  }}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete selected
+                </Button>
+              ) : null}
               {canCreate ? (
                 <Button type="button" onClick={() => setIsCreateOpen(true)}>
                   {kind === 'students' ? 'Add Student' : 'Add Teacher'}
@@ -925,6 +1031,27 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
                 value={searchInput}
               />
             </div>
+            <select
+              className={`h-12 rounded-full border px-4 text-sm font-semibold ${dashboardColors.panel}`}
+              value={statusFilter}
+              onChange={(event) => updateStatusFilter(event.target.value)}
+            >
+              {kind === 'students' ? (
+                <>
+                  <option value="all">All status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="graduated">Graduated</option>
+                  <option value="archived">Archived</option>
+                </>
+              ) : (
+                <>
+                  <option value="all">All email status</option>
+                  <option value="verified">Verified</option>
+                  <option value="unverified">Unverified</option>
+                </>
+              )}
+            </select>
             <Button className="h-12" type="submit">Search</Button>
           </form>
 
@@ -938,6 +1065,14 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
             <Table>
               <TableHeader className={dashboardColors.tableHeader}>
                 <TableRow>
+                  {canDelete ? (
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={allVisibleRowsSelected}
+                        onCheckedChange={(checked) => toggleVisibleRows(Boolean(checked))}
+                      />
+                    </TableHead>
+                  ) : null}
                   {columns.map((column) => (
                     <TableHead key={column} className="whitespace-nowrap font-semibold">{column}</TableHead>
                   ))}
@@ -946,14 +1081,14 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell className={`h-28 text-center ${colors.app.muted}`} colSpan={columns.length}>
+                    <TableCell className={`h-28 text-center ${colors.app.muted}`} colSpan={columns.length + (canDelete ? 1 : 0)}>
                       Loading {kind}...
                     </TableCell>
                   </TableRow>
                 ) : null}
                 {!isLoading && rows.length === 0 ? (
                   <TableRow>
-                    <TableCell className="h-36 text-center" colSpan={columns.length}>
+                    <TableCell className="h-36 text-center" colSpan={columns.length + (canDelete ? 1 : 0)}>
                       <Icon className={`mx-auto mb-3 h-8 w-8 ${colors.app.muted}`} />
                       <p className="font-semibold">{emptyText}</p>
                     </TableCell>
@@ -962,6 +1097,14 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
                 {!isLoading
                   ? rows.map((row) => (
                     <TableRow key={row.id} className={`${colors.app.border} ${colors.app.backgroundHover}`}>
+                      {canDelete ? (
+                        <TableCell className="w-12">
+                          <Checkbox
+                            checked={selectedIds.has(row.id)}
+                            onCheckedChange={(checked) => toggleRowSelection(row.id, Boolean(checked))}
+                          />
+                        </TableCell>
+                      ) : null}
                       {getCells(row).map((cell, index) => (
                         <TableCell key={`${row.id}-${columns[index]}`} className="whitespace-nowrap">
                           {cell}
@@ -1069,6 +1212,34 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Delete selected {kind === 'students' ? 'students' : 'teachers'}</DialogTitle>
+            <DialogDescription>
+              {kind === 'students'
+                ? `Delete ${selectedCount} selected student record${selectedCount === 1 ? '' : 's'} from this organization. Related class roster, enrollment, and progress rows will follow the database cascade rules.`
+                : `Remove ${selectedCount} selected teacher member${selectedCount === 1 ? '' : 's'} from this organization. Their global login account is not deleted.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {deleteError ? (
+            <div className={`rounded-2xl border p-4 text-sm ${colors.danger.subtleBg} ${colors.app.border}`}>
+              {deleteError}
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button disabled={isDeleting} type="button" variant="secondary" onClick={() => setIsDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={isDeleting || selectedCount === 0} type="button" variant="destructive" onClick={deleteSelectedRows}>
+              {isDeleting ? 'Deleting...' : 'Delete selected'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -6,6 +6,7 @@ import { auth } from '../auth/index.js'
 import { getPaginationMeta, type PaginationInput } from '../lib/pagination.js'
 
 export class DirectoryProvisioningError extends Error {}
+export class DirectoryRecordNotFoundError extends Error {}
 
 interface StudentRecord {
   id: string
@@ -129,28 +130,53 @@ export async function createStudent({
   }
 }
 
+export async function deleteStudent({
+  organizationId,
+  studentId,
+}: {
+  organizationId: string
+  studentId: string
+}) {
+  const result = await prisma.student.deleteMany({
+    where: {
+      id: studentId,
+      organizationId,
+    },
+  })
+
+  if (result.count === 0) {
+    throw new DirectoryRecordNotFoundError('Student was not found in this organization.')
+  }
+}
+
 export async function listTeachers({
+  emailStatus,
   organizationId,
   pagination,
   search,
 }: {
+  emailStatus?: string
   organizationId: string
   pagination: PaginationInput
   search?: string
 }) {
+  const userWhere: Prisma.UserWhereInput = {
+    ...(emailStatus === 'verified' || emailStatus === 'unverified'
+      ? { emailVerified: emailStatus === 'verified' }
+      : {}),
+    ...(search
+      ? {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } },
+          ],
+        }
+      : {}),
+  }
   const where: Prisma.MemberWhereInput = {
     organizationId,
     role: 'teacher',
-    ...(search
-      ? {
-          user: {
-            OR: [
-              { name: { contains: search, mode: 'insensitive' } },
-              { email: { contains: search, mode: 'insensitive' } },
-            ],
-          },
-        }
-      : {}),
+    ...(Object.keys(userWhere).length > 0 ? { user: userWhere } : {}),
   }
 
   const [teachers, total] = await prisma.$transaction([
@@ -279,6 +305,26 @@ export async function createTeacher({
     role: teacher.role,
     createdAt: teacher.createdAt.toISOString(),
     user: teacher.user,
+  }
+}
+
+export async function deleteTeacher({
+  organizationId,
+  teacherId,
+}: {
+  organizationId: string
+  teacherId: string
+}) {
+  const result = await prisma.member.deleteMany({
+    where: {
+      id: teacherId,
+      organizationId,
+      role: 'teacher',
+    },
+  })
+
+  if (result.count === 0) {
+    throw new DirectoryRecordNotFoundError('Teacher was not found in this organization.')
   }
 }
 

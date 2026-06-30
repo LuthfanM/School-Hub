@@ -1,9 +1,11 @@
 import { Hono } from 'hono'
 
 import {
+  ActiveOrganizationPreferenceError,
   getLoginContext,
   getSessionPayload,
   isSupportedLanguage,
+  updateUserActiveOrganizationPreference,
   updateUserLanguagePreference,
 } from '../services/session.service.js'
 import type { AppEnv } from '../types/app-env.js'
@@ -59,4 +61,31 @@ sessionRoutes.patch('/session/preferences/language', async (c) => {
   const preferences = await updateUserLanguagePreference(user.id, language)
 
   return c.json({ preferences })
+})
+
+sessionRoutes.patch('/session/preferences/active-organization', async (c) => {
+  const user = c.get('user')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const body = await c.req.json().catch(() => null)
+  const organizationId = typeof body?.organizationId === 'string' ? body.organizationId.trim() : ''
+
+  if (!organizationId) {
+    return c.json({ error: 'Organization is required.' }, 400)
+  }
+
+  try {
+    const preferences = await updateUserActiveOrganizationPreference(user.id, organizationId)
+
+    return c.json({ preferences })
+  } catch (error) {
+    if (error instanceof ActiveOrganizationPreferenceError) {
+      return c.json({ error: error.message }, 400)
+    }
+
+    throw error
+  }
 })

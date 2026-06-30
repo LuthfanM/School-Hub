@@ -28,10 +28,12 @@ interface DashboardSessionMembership {
 interface DashboardSession {
   user: DashboardSessionUser
   preferences?: {
+    activeOrganizationId?: string | null
     language?: string | null
   }
   memberships?: DashboardSessionMembership[]
   activeMembership?: DashboardSessionMembership | null
+  requiresOrganizationSelection?: boolean
 }
 
 export const getDashboardSession = createServerFn({ method: 'GET' }).handler(async () => {
@@ -48,6 +50,10 @@ export const getDashboardSession = createServerFn({ method: 'GET' }).handler(asy
   const session = (await response.json()) as DashboardSession
   const isPlatformAdmin = session.user.platformRole === 'platform_admin'
 
+  if (!isPlatformAdmin && session.requiresOrganizationSelection) {
+    throw redirect({ to: '/choose-organization' })
+  }
+
   if (!isPlatformAdmin && !session.activeMembership) {
     throw redirect({ to: '/auth/login' })
   }
@@ -61,6 +67,7 @@ export const getDashboardSession = createServerFn({ method: 'GET' }).handler(asy
       language: session.preferences?.language ?? session.user.language ?? 'en',
     },
     preferences: {
+      activeOrganizationId: session.preferences?.activeOrganizationId ?? session.activeMembership?.organization.id ?? null,
       language: session.preferences?.language ?? session.user.language ?? 'en',
     },
     memberships: session.memberships ?? [],
