@@ -42,6 +42,7 @@ interface PaginatedResponse<T> {
 interface StudentRow {
   id: string
   fullName: string
+  hasCredential?: boolean
   nisn: string | null
   email: string | null
   phone: string | null
@@ -67,6 +68,13 @@ interface CreateStudentResponse {
 
 interface CreateTeacherResponse {
   teacher: TeacherRow
+}
+
+interface StudentCredentialResponse {
+  credential: {
+    temporaryPassword: string
+    username: string
+  }
 }
 
 type DirectoryKind = 'students' | 'teachers'
@@ -750,6 +758,13 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [credentialResult, setCredentialResult] = useState<{
+    schoolCode: string
+    studentName: string
+    temporaryPassword: string
+    username: string
+  } | null>(null)
+  const [credentialStudentId, setCredentialStudentId] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -898,6 +913,42 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
       setDeleteError(requestError instanceof Error ? requestError.message : `Failed to delete selected ${kind}.`)
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  async function createOrResetStudentLogin(row: T) {
+    if (!organization || kind !== 'students') return
+
+    const student = row as unknown as StudentRow
+    setCredentialStudentId(student.id)
+    setError(null)
+
+    try {
+      const response = await apiRequest<StudentCredentialResponse>(`/api/organizations/${organization.id}/students/${student.id}/credential`, {
+        method: 'POST',
+        body: JSON.stringify({
+          username: student.nisn || undefined,
+        }),
+      })
+
+      setRows((currentRows) => currentRows.map((currentRow) => {
+        if (currentRow.id !== student.id) return currentRow
+
+        return {
+          ...currentRow,
+          hasCredential: true,
+        }
+      }))
+      setCredentialResult({
+        schoolCode: organization.slug,
+        studentName: student.fullName,
+        temporaryPassword: response.credential.temporaryPassword,
+        username: response.credential.username,
+      })
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Failed to create student login.')
+    } finally {
+      setCredentialStudentId(null)
     }
   }
 
@@ -1076,19 +1127,22 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
                   {columns.map((column) => (
                     <TableHead key={column} className="whitespace-nowrap font-semibold">{column}</TableHead>
                   ))}
+                  {kind === 'students' && canDelete ? (
+                    <TableHead className="whitespace-nowrap font-semibold">Login</TableHead>
+                  ) : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell className={`h-28 text-center ${colors.app.muted}`} colSpan={columns.length + (canDelete ? 1 : 0)}>
+                    <TableCell className={`h-28 text-center ${colors.app.muted}`} colSpan={columns.length + (canDelete ? 1 : 0) + (kind === 'students' && canDelete ? 1 : 0)}>
                       Loading {kind}...
                     </TableCell>
                   </TableRow>
                 ) : null}
                 {!isLoading && rows.length === 0 ? (
                   <TableRow>
-                    <TableCell className="h-36 text-center" colSpan={columns.length + (canDelete ? 1 : 0)}>
+                    <TableCell className="h-36 text-center" colSpan={columns.length + (canDelete ? 1 : 0) + (kind === 'students' && canDelete ? 1 : 0)}>
                       <Icon className={`mx-auto mb-3 h-8 w-8 ${colors.app.muted}`} />
                       <p className="font-semibold">{emptyText}</p>
                     </TableCell>
@@ -1110,6 +1164,23 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
                           {cell}
                         </TableCell>
                       ))}
+                      {kind === 'students' && canDelete ? (
+                        <TableCell className="whitespace-nowrap">
+                          <Button
+                            disabled={credentialStudentId === row.id}
+                            size="sm"
+                            type="button"
+                            variant="secondary"
+                            onClick={() => createOrResetStudentLogin(row)}
+                          >
+                            {credentialStudentId === row.id
+                              ? 'Preparing...'
+                              : (row as unknown as StudentRow).hasCredential
+                                ? 'Reset Login'
+                                : 'Create Login'}
+                          </Button>
+                        </TableCell>
+                      ) : null}
                     </TableRow>
                   ))
                   : null}
@@ -1238,6 +1309,39 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
             </Button>
             <Button disabled={isDeleting || selectedCount === 0} type="button" variant="destructive" onClick={deleteSelectedRows}>
               {isDeleting ? 'Deleting...' : 'Delete selected'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(credentialResult)} onOpenChange={(isOpen) => {
+        if (!isOpen) setCredentialResult(null)
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Student login ready</DialogTitle>
+            <DialogDescription>
+              Give this temporary password to the student. It is only shown once and the student must change it after login.
+            </DialogDescription>
+          </DialogHeader>
+
+          {credentialResult ? (
+            <div className="space-y-3">
+              <div className={`rounded-2xl border p-4 ${dashboardColors.panel}`}>
+                <p className="font-semibold">{credentialResult.studentName}</p>
+                <p className={`mt-2 font-mono text-sm ${colors.app.muted}`}>School code: {credentialResult.schoolCode}</p>
+                <p className={`mt-1 font-mono text-sm ${colors.app.muted}`}>Student ID: {credentialResult.username}</p>
+                <p className="mt-2 font-mono text-lg font-bold">Password: {credentialResult.temporaryPassword}</p>
+              </div>
+              <p className={`text-sm ${colors.app.muted}`}>
+                Student login URL: /auth/student-login
+              </p>
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button type="button" onClick={() => setCredentialResult(null)}>
+              Done
             </Button>
           </DialogFooter>
         </DialogContent>

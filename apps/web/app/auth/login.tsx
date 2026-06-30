@@ -126,6 +126,9 @@ function LoginPage() {
         <p className="mt-6 text-sm text-[#6F6A62]">
           New school? <Link to="/auth/register" className="font-semibold text-[#2563EB]">Create account</Link>
         </p>
+        <p className="mt-3 text-sm text-[#6F6A62]">
+          Student account? <Link to="/auth/student-login" className="font-semibold text-[#2563EB]">Login as student</Link>
+        </p>
         </CardContent>
       </Card>
     </main>

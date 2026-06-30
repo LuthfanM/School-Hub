@@ -27,8 +27,48 @@ sessionRoutes.get('/login-context', async (c) => {
 sessionRoutes.get('/session', async (c) => {
   const user = c.get('user')
   const session = c.get('session')
+  const studentSession = c.get('studentSession')
 
   if (!user || !session) {
+    if (studentSession) {
+      const activeMembership = {
+        id: `student:${studentSession.student.id}`,
+        role: 'student',
+        permissions: [],
+        organization: studentSession.organization,
+      }
+
+      return c.json({
+        user: {
+          id: `student:${studentSession.student.id}`,
+          name: studentSession.student.fullName,
+          email: '',
+          platformRole: 'user',
+          language: 'en',
+        },
+        session: {
+          id: studentSession.id,
+          userId: `student:${studentSession.student.id}`,
+          expiresAt: studentSession.expiresAt,
+        },
+        preferences: {
+          activeOrganizationId: studentSession.organization.id,
+          language: 'en',
+        },
+        memberships: [activeMembership],
+        activeMembership,
+        activeStudent: {
+          id: studentSession.student.id,
+          fullName: studentSession.student.fullName,
+          mustChangePassword: studentSession.student.credential?.mustChangePassword ?? false,
+          nisn: studentSession.student.nisn,
+          status: studentSession.student.status,
+        },
+        hasMultipleActiveMemberships: false,
+        requiresOrganizationSelection: false,
+      })
+    }
+
     return c.json({ error: 'Unauthorized' }, 401)
   }
 

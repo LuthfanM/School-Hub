@@ -33,6 +33,9 @@ interface DashboardSession {
   }
   memberships?: DashboardSessionMembership[]
   activeMembership?: DashboardSessionMembership | null
+  activeStudent?: {
+    mustChangePassword?: boolean
+  } | null
   requiresOrganizationSelection?: boolean
 }
 
@@ -52,6 +55,10 @@ export const getDashboardSession = createServerFn({ method: 'GET' }).handler(asy
 
   if (!isPlatformAdmin && session.requiresOrganizationSelection) {
     throw redirect({ to: '/choose-organization' })
+  }
+
+  if (session.activeStudent?.mustChangePassword) {
+    throw redirect({ to: '/auth/student-change-password' })
   }
 
   if (!isPlatformAdmin && !session.activeMembership) {

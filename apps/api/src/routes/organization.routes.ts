@@ -34,6 +34,10 @@ import {
   listTeachers,
 } from '../services/organization-directory.service.js'
 import {
+  createStudentCredential,
+  StudentAuthError,
+} from '../services/student-auth.service.js'
+import {
   canManageDashboardResource,
   canReadDashboardResource,
   getOrganizationMembership,
@@ -298,6 +302,44 @@ organizationRoutes.delete('/:organizationId/students/:studentId', async (c) => {
   } catch (error) {
     if (error instanceof DirectoryRecordNotFoundError) {
       return c.json({ error: error.message }, 404)
+    }
+
+    throw error
+  }
+})
+
+organizationRoutes.post('/:organizationId/students/:studentId/credential', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.req.param('organizationId')
+  const studentId = c.req.param('studentId')
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const membership = await getOrganizationMembership(user.id, organizationId)
+
+  if (user.platformRole !== 'platform_admin' && !canManageDashboardResource(membership, 'students')) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  const body = await c.req.json().catch(() => null)
+  const username =
+    typeof body?.username === 'string' && body.username.trim()
+      ? body.username.trim()
+      : undefined
+
+  try {
+    const credential = await createStudentCredential({
+      organizationId,
+      studentId,
+      username,
+    })
+
+    return c.json({ credential })
+  } catch (error) {
+    if (error instanceof StudentAuthError) {
+      return c.json({ error: error.message }, 400)
     }
 
     throw error

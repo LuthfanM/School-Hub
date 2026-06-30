@@ -16,6 +16,9 @@ interface StudentRecord {
   phone: string | null
   status: string
   createdAt: Date
+  credential: {
+    id: string
+  } | null
 }
 
 interface TeacherRecord {
@@ -70,6 +73,11 @@ export async function listStudents({
         phone: true,
         status: true,
         createdAt: true,
+        credential: {
+          select: {
+            id: true,
+          },
+        },
       },
     }),
     prisma.student.count({ where }),
@@ -79,6 +87,8 @@ export async function listStudents({
     data: students.map((student: StudentRecord) => ({
       ...student,
       createdAt: student.createdAt.toISOString(),
+      hasCredential: Boolean(student.credential),
+      credential: undefined,
     })),
     pagination: getPaginationMeta(pagination.page, pagination.limit, total),
   }
