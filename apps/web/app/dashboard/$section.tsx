@@ -58,11 +58,11 @@ function DashboardSectionPage() {
         {hasAccess && isClasses ? <ClassesScreen organization={activeOrganization} /> : null}
         {hasAccess ? (
         !isPlatformTenants && !isPlatformSettings && !isStudents && !isAdmins && !isTeachers && !isClasses ? (
-        <Card className={`rounded-[28px] ${dashboardColors.card}`}>
+        <Card className={`rounded-[2rem] ${dashboardColors.card}`}>
           <CardContent className="p-6 sm:p-8">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
             <div>
-              <p className={`text-sm font-bold uppercase tracking-[0.18em] ${colors.brand.text}`}>{roles[role].badge}</p>
+              <p className={`text-sm font-bold ${colors.brand.text}`}>{roles[role].badge}</p>
               <h1 className="mt-2 text-4xl font-bold tracking-tight">{title}</h1>
               <p className={`mt-3 max-w-2xl ${colors.app.muted}`}>
                 {screen?.description ?? 'This route is not described yet.'}
@@ -156,7 +156,7 @@ function RestrictedSection({
   sectionTitle: string
 }) {
   return (
-    <Card className={`rounded-[28px] ${dashboardColors.card}`}>
+    <Card className={`rounded-[2rem] ${dashboardColors.card}`}>
       <CardContent className="p-8">
         <CircleAlert className={`mb-5 h-10 w-10 ${colors.warning.icon}`} />
         <h1 className="text-3xl font-bold">Restricted screen</h1>

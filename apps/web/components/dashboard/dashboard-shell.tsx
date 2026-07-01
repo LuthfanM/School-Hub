@@ -93,12 +93,12 @@ export function DashboardShell({
         setRole: setDemoRole,
       }}
     >
-      <main className={`h-screen overflow-hidden ${dashboardColors.page}`}>
-        <div className="grid h-full lg:grid-cols-[280px_minmax(0,1fr)]">
+      <main className={`h-[100dvh] overflow-hidden ${dashboardColors.page}`}>
+        <div className="grid h-full gap-4 p-3 lg:grid-cols-[292px_minmax(0,1fr)] lg:p-4">
           <div className="hidden lg:block">
             <DashboardSidebar />
           </div>
-          <div className="h-full min-w-0 overflow-y-auto">
+          <div className="h-full min-w-0 overflow-y-auto rounded-[2rem] border border-[#d8e5df] bg-white/54 shadow-[0_24px_70px_rgba(18,52,59,0.08)]">
             {isOverview ? <DashboardOverview /> : <Outlet />}
           </div>
         </div>

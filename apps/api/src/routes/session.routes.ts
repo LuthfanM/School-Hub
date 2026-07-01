@@ -1,5 +1,7 @@
 import { Hono } from 'hono'
+import { z } from 'zod'
 
+import { firstValidationMessage } from '../lib/validation.js'
 import {
   ActiveOrganizationPreferenceError,
   getLoginContext,
@@ -12,14 +14,22 @@ import type { AppEnv } from '../types/app-env.js'
 
 export const sessionRoutes = new Hono<AppEnv>()
 
-sessionRoutes.get('/login-context', async (c) => {
-  const email = c.req.query('email')?.trim().toLowerCase()
+const loginContextQuerySchema = z.string().trim().toLowerCase().email()
+const languagePreferenceSchema = z.object({
+  language: z.string().trim(),
+})
+const activeOrganizationPreferenceSchema = z.object({
+  organizationId: z.string().trim().min(1, 'Organization is required.'),
+})
 
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+sessionRoutes.get('/login-context', async (c) => {
+  const email = loginContextQuerySchema.safeParse(c.req.query('email'))
+
+  if (!email.success) {
     return c.json({ status: 'unknown' })
   }
 
-  const context = await getLoginContext(email)
+  const context = await getLoginContext(email.data)
 
   return c.json(context)
 })
@@ -92,13 +102,13 @@ sessionRoutes.patch('/session/preferences/language', async (c) => {
   }
 
   const body = await c.req.json().catch(() => null)
-  const language = typeof body?.language === 'string' ? body.language.trim() : ''
+  const parsedBody = languagePreferenceSchema.safeParse(body)
 
-  if (!isSupportedLanguage(language)) {
+  if (!parsedBody.success || !isSupportedLanguage(parsedBody.data.language)) {
     return c.json({ error: 'Language is not supported.' }, 400)
   }
 
-  const preferences = await updateUserLanguagePreference(user.id, language)
+  const preferences = await updateUserLanguagePreference(user.id, parsedBody.data.language)
 
   return c.json({ preferences })
 })
@@ -111,14 +121,13 @@ sessionRoutes.patch('/session/preferences/active-organization', async (c) => {
   }
 
   const body = await c.req.json().catch(() => null)
-  const organizationId = typeof body?.organizationId === 'string' ? body.organizationId.trim() : ''
-
-  if (!organizationId) {
-    return c.json({ error: 'Organization is required.' }, 400)
+  const parsedBody = activeOrganizationPreferenceSchema.safeParse(body)
+  if (!parsedBody.success) {
+    return c.json({ error: firstValidationMessage(parsedBody.error) }, 400)
   }
 
   try {
-    const preferences = await updateUserActiveOrganizationPreference(user.id, organizationId)
+    const preferences = await updateUserActiveOrganizationPreference(user.id, parsedBody.data.organizationId)
 
     return c.json({ preferences })
   } catch (error) {

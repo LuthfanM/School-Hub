@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@schoolhub/ui/components/dialog'
 import { Input } from '@schoolhub/ui/components/input'
+import { Skeleton } from '@schoolhub/ui/components/skeleton'
 import {
   Select,
   SelectContent,
@@ -37,6 +38,12 @@ import {
 } from 'lucide-react'
 
 import { apiRequest } from '../../lib/api'
+import {
+  classAnnouncementFormSchema,
+  classFormSchema,
+  classUpdateFormSchema,
+  firstValidationMessage,
+} from '../../lib/form-validation'
 import { useDashboardRole } from '../../lib/role-context'
 import type { ActiveOrganization } from '../../lib/role-context'
 import { colors, dashboardColors } from '../../styles/colors'
@@ -277,14 +284,23 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
     setCreateError(null)
 
     try {
+      const parsedForm = classFormSchema.safeParse({
+        ...createForm,
+        homeroomTeacherId: createForm.homeroomTeacherId === 'none' ? undefined : createForm.homeroomTeacherId,
+      })
+      if (!parsedForm.success) {
+        setCreateError(firstValidationMessage(parsedForm.error))
+        return
+      }
+
       const response = await apiRequest<CreateClassResponse>(`/api/organizations/${organization.id}/classes`, {
         method: 'POST',
         body: JSON.stringify({
-          name: createForm.name,
-          code: createForm.code,
-          academicYear: createForm.academicYear,
-          capacity: Number(createForm.capacity),
-          homeroomTeacherId: createForm.homeroomTeacherId === 'none' ? undefined : createForm.homeroomTeacherId,
+          name: parsedForm.data.name,
+          code: parsedForm.data.code,
+          academicYear: parsedForm.data.academicYear,
+          capacity: parsedForm.data.capacity,
+          homeroomTeacherId: parsedForm.data.homeroomTeacherId,
         }),
       })
 
@@ -339,15 +355,24 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
     setEditError(null)
 
     try {
+      const parsedForm = classUpdateFormSchema.safeParse({
+        ...editForm,
+        homeroomTeacherId: editForm.homeroomTeacherId === 'none' ? undefined : editForm.homeroomTeacherId,
+      })
+      if (!parsedForm.success) {
+        setEditError(firstValidationMessage(parsedForm.error))
+        return
+      }
+
       const response = await apiRequest<CreateClassResponse>(`/api/organizations/${organization.id}/classes/${classDetail.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
-          name: editForm.name,
-          code: editForm.code,
-          academicYear: editForm.academicYear,
-          capacity: Number(editForm.capacity),
-          status: editForm.status,
-          homeroomTeacherId: editForm.homeroomTeacherId === 'none' ? undefined : editForm.homeroomTeacherId,
+          name: parsedForm.data.name,
+          code: parsedForm.data.code,
+          academicYear: parsedForm.data.academicYear,
+          capacity: parsedForm.data.capacity,
+          status: parsedForm.data.status,
+          homeroomTeacherId: parsedForm.data.homeroomTeacherId,
         }),
       })
 
@@ -401,12 +426,18 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
     setAnnouncementError(null)
 
     try {
+      const parsedForm = classAnnouncementFormSchema.safeParse(announcementForm)
+      if (!parsedForm.success) {
+        setAnnouncementError(firstValidationMessage(parsedForm.error))
+        return
+      }
+
       const isEdit = announcementMode === 'edit' && editingAnnouncementId
       const response = await apiRequest<CreateClassAnnouncementResponse>(`/api/organizations/${organization.id}/classes/${classDetail.id}/announcements${isEdit ? `/${editingAnnouncementId}` : ''}`, {
         method: isEdit ? 'PATCH' : 'POST',
         body: JSON.stringify({
-          title: announcementForm.title,
-          body: announcementForm.body,
+          title: parsedForm.data.title,
+          body: parsedForm.data.body,
         }),
       })
 
@@ -484,7 +515,7 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
 
   if (!organization) {
     return (
-      <Card className={`rounded-[28px] ${dashboardColors.card}`}>
+      <Card className={`rounded-[2rem] ${dashboardColors.card}`}>
         <CardContent className="p-8">
           <GraduationCap className={`mb-4 h-10 w-10 ${colors.warning.icon}`} />
           <h1 className="text-3xl font-bold">No active organization</h1>
@@ -549,11 +580,11 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
 
   return (
     <div className="w-full space-y-6">
-      <Card className={`rounded-[28px] ${dashboardColors.card}`}>
+      <Card className={`rounded-[2rem] ${dashboardColors.card}`}>
         <CardContent className="p-6 sm:p-8">
           <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
             <div>
-              <p className={`text-sm font-bold uppercase tracking-[0.18em] ${colors.brand.text}`}>
+              <p className={`text-sm font-bold ${colors.brand.text}`}>
                 {organization.name}
               </p>
               <h1 className="mt-2 text-4xl font-bold tracking-tight">Classes</h1>
@@ -610,8 +641,8 @@ export function ClassesScreen({ organization }: { organization: ActiveOrganizati
           ) : null}
 
           {isLoading ? (
-            <div className={`mt-6 rounded-2xl border p-8 text-center ${dashboardColors.panel} ${colors.app.muted}`}>
-              Loading classes...
+            <div className={`mt-6 grid gap-4 rounded-2xl border p-4 ${dashboardColors.panel}`}>
+              <ClassCardsSkeleton />
             </div>
           ) : null}
 
@@ -805,20 +836,31 @@ function ClassDetailView({
       </Button>
 
       {isDetailLoading ? (
-        <Card className={`rounded-[28px] ${dashboardColors.card}`}>
-          <CardContent className={`p-8 text-center ${colors.app.muted}`}>Loading class detail...</CardContent>
+        <Card className={`rounded-[2rem] ${dashboardColors.card}`}>
+          <CardContent className="p-6 sm:p-8">
+            <div className="space-y-5">
+              <Skeleton className="schoolhub-skeleton h-8 w-40 rounded-full bg-[#dff4eb]" />
+              <Skeleton className="schoolhub-skeleton h-10 w-2/3 rounded-2xl bg-[#dff4eb]" />
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[1, 2, 3].map((item) => (
+                  <Skeleton key={item} className="schoolhub-skeleton h-24 rounded-2xl bg-[#dff4eb]" />
+                ))}
+              </div>
+              <Skeleton className="schoolhub-skeleton h-64 rounded-2xl bg-[#dff4eb]" />
+            </div>
+          </CardContent>
         </Card>
       ) : null}
 
       {detailError ? (
-        <Card className={`rounded-[28px] ${dashboardColors.card}`}>
+        <Card className={`rounded-[2rem] ${dashboardColors.card}`}>
           <CardContent className={`p-8 ${colors.danger.text}`}>{detailError}</CardContent>
         </Card>
       ) : null}
 
       {classDetail ? (
         <>
-          <Card className={`rounded-[28px] ${dashboardColors.card}`}>
+          <Card className={`rounded-[2rem] ${dashboardColors.card}`}>
             <CardContent className="p-6 sm:p-8">
               <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
                 <div>
@@ -1169,6 +1211,24 @@ function MetricCard({ label, meta, value }: { label: string; meta: string; value
       <p className={`text-sm ${colors.app.muted}`}>{label}</p>
       <p className="mt-2 font-mono text-2xl font-bold">{value}</p>
       <p className={`mt-1 text-xs ${colors.app.muted}`}>{meta}</p>
+    </div>
+  )
+}
+
+function ClassCardsSkeleton() {
+  return (
+    <div className="grid gap-4 xl:grid-cols-3">
+      {[1, 2, 3].map((item) => (
+        <div key={item} className="rounded-2xl border border-[#d8e5df] bg-white p-5">
+          <Skeleton className="schoolhub-skeleton h-7 w-24 rounded-full bg-[#dff4eb]" />
+          <Skeleton className="schoolhub-skeleton mt-5 h-7 w-2/3 rounded-2xl bg-[#dff4eb]" />
+          <Skeleton className="schoolhub-skeleton mt-3 h-4 w-1/2 rounded-2xl bg-[#dff4eb]" />
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <Skeleton className="schoolhub-skeleton h-16 rounded-2xl bg-[#dff4eb]" />
+            <Skeleton className="schoolhub-skeleton h-16 rounded-2xl bg-[#dff4eb]" />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@scho
 import { Checkbox } from '@schoolhub/ui/components/checkbox'
 import { Input } from '@schoolhub/ui/components/input'
 import { authClient } from '../../lib/auth-client'
+import { firstValidationMessage, registerWorkspaceFormSchema } from '../../lib/form-validation'
 
 export const Route = createFileRoute('/auth/register')({
   component: RegisterPage,
@@ -24,10 +25,22 @@ function RegisterPage() {
     setError(null)
     setIsSubmitting(true)
 
-    const signUpResult = await authClient.signUp.email({
+    const parsedForm = registerWorkspaceFormSchema.safeParse({
       email,
+      fullName,
       password,
-      name: fullName,
+      schoolName,
+    })
+    if (!parsedForm.success) {
+      setError(firstValidationMessage(parsedForm.error))
+      setIsSubmitting(false)
+      return
+    }
+
+    const signUpResult = await authClient.signUp.email({
+      email: parsedForm.data.email,
+      password: parsedForm.data.password,
+      name: parsedForm.data.fullName,
       callbackURL: '/dashboard',
     })
 
@@ -37,14 +50,13 @@ function RegisterPage() {
       return
     }
 
-    const slug = schoolName
-      .trim()
+    const slug = parsedForm.data.schoolName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
 
     const orgResult = await authClient.organization.create({
-      name: schoolName,
+      name: parsedForm.data.schoolName,
       slug,
     })
 
@@ -59,32 +71,35 @@ function RegisterPage() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[#F7F4EE] p-4 text-[#151515]">
-      <Card className="w-full max-w-lg rounded-[28px] border-[#E5DED3] bg-white">
+    <main className="schoolhub-page grid min-h-[100dvh] place-items-center p-4 text-[#15313a]">
+      <Card className="w-full max-w-lg rounded-[2rem] border-[#d8e5df] bg-white/92 shadow-[0_24px_70px_rgba(18,52,59,0.10)]">
         <CardHeader className="p-8 pb-0">
-          <Link to="/" className="text-sm font-semibold text-[#2563EB]">SchoolHub</Link>
-          <CardTitle className="mt-5 text-3xl">Create school workspace</CardTitle>
-          <CardDescription className="text-base text-[#6F6A62]">Create your admin account and first workspace.</CardDescription>
+          <Link to="/" className="inline-flex items-center gap-3 text-sm font-semibold text-[#1d6d54]">
+            <span className="grid h-9 w-9 place-items-center rounded-2xl bg-[#12343b] text-xs font-bold text-white">SH</span>
+            SchoolHub
+          </Link>
+          <CardTitle className="mt-6 text-3xl text-[#15313a]">Create school workspace</CardTitle>
+          <CardDescription className="text-base text-[#526a70]">Create your admin account and first workspace.</CardDescription>
         </CardHeader>
         <CardContent className="p-8">
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
-              className="h-12 rounded-2xl border-[#E5DED3] bg-[#F7F4EE]"
+              className="h-12 rounded-2xl border-[#d8e5df] bg-[#f7fbf8]"
               onChange={(event) => setFullName(event.target.value)}
               placeholder="Full name"
               required
               value={fullName}
             />
             <Input
-              className="h-12 rounded-2xl border-[#E5DED3] bg-[#F7F4EE]"
+              className="h-12 rounded-2xl border-[#d8e5df] bg-[#f7fbf8]"
               onChange={(event) => setSchoolName(event.target.value)}
               placeholder="School name"
               required
               value={schoolName}
             />
             <Input
-              className="h-12 rounded-2xl border-[#E5DED3] bg-[#F7F4EE] sm:col-span-2"
+              className="h-12 rounded-2xl border-[#d8e5df] bg-[#f7fbf8] sm:col-span-2"
               onChange={(event) => setEmail(event.target.value)}
               placeholder="Email address"
               required
@@ -92,7 +107,7 @@ function RegisterPage() {
               value={email}
             />
             <Input
-              className="h-12 rounded-2xl border-[#E5DED3] bg-[#F7F4EE] sm:col-span-2"
+              className="h-12 rounded-2xl border-[#d8e5df] bg-[#f7fbf8] sm:col-span-2"
               minLength={8}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="Password"
@@ -101,17 +116,17 @@ function RegisterPage() {
               value={password}
             />
           </div>
-          <label className="mt-5 flex items-center gap-3 text-sm text-[#6F6A62]">
+          <label className="mt-5 flex items-center gap-3 text-sm text-[#526a70]">
             <Checkbox required />
             I agree to set up this workspace.
           </label>
           {error ? <p className="mt-4 text-sm font-medium text-red-600">{error}</p> : null}
-          <Button className="mt-6 w-full" disabled={isSubmitting} type="submit">
+          <Button className="mt-6 w-full rounded-full bg-[#12343b] text-white hover:bg-[#1d4b52]" disabled={isSubmitting} type="submit">
             {isSubmitting ? 'Creating...' : 'Create Workspace'}
           </Button>
         </form>
-        <p className="mt-6 text-sm text-[#6F6A62]">
-          Already have an account? <Link to="/auth/login" className="font-semibold text-[#2563EB]">Login</Link>
+        <p className="mt-6 text-sm text-[#526a70]">
+          Already have an account? <Link to="/auth/login" className="font-semibold text-[#1d6d54]">Login</Link>
         </p>
         </CardContent>
       </Card>

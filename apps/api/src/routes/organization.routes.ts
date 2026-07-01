@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
+import { z } from 'zod'
 
 import { getPagination } from '../lib/pagination.js'
+import { firstValidationMessage, optionalLowercaseEmail, optionalPassword, optionalTrimmedString } from '../lib/validation.js'
 import {
   ClassNotFoundError,
   ClassProvisioningError,
@@ -47,6 +49,67 @@ import type { AppEnv } from '../types/app-env.js'
 
 export const organizationRoutes = new Hono<AppEnv>()
 
+const adminFormSchema = z.object({
+  name: z.string().trim().min(1, 'Admin name is required.'),
+  email: z.string().trim().toLowerCase().email('Admin email is not valid.'),
+  password: optionalPassword('Admin password must be at least 8 characters.'),
+  accessMode: z.enum(['all', 'custom']).catch('all'),
+  permissions: z.unknown().transform(parseAdminPermissions),
+}).refine((value) => value.accessMode !== 'custom' || value.permissions.length > 0, {
+  message: 'Choose at least one admin permission.',
+  path: ['permissions'],
+})
+
+const adminPermissionUpdateSchema = z.object({
+  accessMode: z.enum(['all', 'custom']).catch('all'),
+  permissions: z.unknown().transform(parseAdminPermissions),
+}).refine((value) => value.accessMode !== 'custom' || value.permissions.length > 0, {
+  message: 'Choose at least one admin permission.',
+  path: ['permissions'],
+})
+
+const studentFormSchema = z.object({
+  fullName: z.string().trim().min(1, 'Student full name is required.'),
+  nisn: optionalTrimmedString(),
+  email: optionalLowercaseEmail('Student email is not valid.'),
+  phone: optionalTrimmedString(),
+})
+
+const studentCredentialSchema = z.object({
+  username: z.preprocess((value) => {
+    if (typeof value !== 'string') return undefined
+
+    const trimmed = value.trim()
+    return trimmed || undefined
+  }, z.string().optional()),
+})
+
+const classFormSchema = z.object({
+  name: z.string().trim().min(1, 'Class name is required.'),
+  code: z.string().trim().min(1, 'Class code is required.'),
+  academicYear: z.string().trim().min(1, 'Academic year is required.'),
+  capacity: z.preprocess((value) => {
+    if (value === undefined || value === null || value === '') return 30
+    return value
+  }, z.coerce.number().int('Class capacity must be between 1 and 200.').min(1, 'Class capacity must be between 1 and 200.').max(200, 'Class capacity must be between 1 and 200.')),
+  homeroomTeacherId: optionalTrimmedString(),
+})
+
+const classUpdateSchema = classFormSchema.extend({
+  status: z.enum(['active', 'archived']).catch('active'),
+})
+
+const classAnnouncementSchema = z.object({
+  title: z.string().trim().min(1, 'Announcement title is required.'),
+  body: z.string().trim().min(1, 'Announcement body is required.'),
+})
+
+const teacherFormSchema = z.object({
+  name: z.string().trim().min(1, 'Teacher name is required.'),
+  email: z.string().trim().toLowerCase().email('Teacher email is not valid.'),
+  password: optionalPassword('Teacher password must be at least 8 characters.'),
+})
+
 organizationRoutes.get('/:organizationId/admins', async (c) => {
   const user = c.get('user')
   const organizationId = c.req.param('organizationId')
@@ -85,39 +148,19 @@ organizationRoutes.post('/:organizationId/admins', async (c) => {
   }
 
   const body = await c.req.json().catch(() => null)
-  const name = typeof body?.name === 'string' ? body.name.trim() : ''
-  const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
-  const password =
-    typeof body?.password === 'string' && body.password.trim()
-      ? body.password
-      : null
-  const accessMode = body?.accessMode === 'custom' ? 'custom' : 'all'
-  const permissions = parseAdminPermissions(body?.permissions)
-
-  if (!name) {
-    return c.json({ error: 'Admin name is required.' }, 400)
-  }
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return c.json({ error: 'Admin email is not valid.' }, 400)
-  }
-
-  if (password && password.length < 8) {
-    return c.json({ error: 'Admin password must be at least 8 characters.' }, 400)
-  }
-
-  if (accessMode === 'custom' && permissions.length === 0) {
-    return c.json({ error: 'Choose at least one admin permission.' }, 400)
+  const parsedBody = adminFormSchema.safeParse(body)
+  if (!parsedBody.success) {
+    return c.json({ error: firstValidationMessage(parsedBody.error) }, 400)
   }
 
   try {
     const admin = await createOrganizationAdmin({
       organizationId,
-      name,
-      email,
-      password,
-      accessMode,
-      permissions,
+      name: parsedBody.data.name,
+      email: parsedBody.data.email,
+      password: parsedBody.data.password,
+      accessMode: parsedBody.data.accessMode,
+      permissions: parsedBody.data.permissions,
     })
 
     return c.json({ admin }, 201)
@@ -146,19 +189,17 @@ organizationRoutes.patch('/:organizationId/admins/:adminId', async (c) => {
   }
 
   const body = await c.req.json().catch(() => null)
-  const accessMode = body?.accessMode === 'custom' ? 'custom' : 'all'
-  const permissions = parseAdminPermissions(body?.permissions)
-
-  if (accessMode === 'custom' && permissions.length === 0) {
-    return c.json({ error: 'Choose at least one admin permission.' }, 400)
+  const parsedBody = adminPermissionUpdateSchema.safeParse(body)
+  if (!parsedBody.success) {
+    return c.json({ error: firstValidationMessage(parsedBody.error) }, 400)
   }
 
   try {
     const admin = await updateOrganizationAdminPermissions({
       adminId,
       organizationId,
-      accessMode,
-      permissions,
+      accessMode: parsedBody.data.accessMode,
+      permissions: parsedBody.data.permissions,
     })
 
     return c.json({ admin })
@@ -213,7 +254,6 @@ organizationRoutes.get('/:organizationId/students', async (c) => {
   const membership = await getOrganizationMembership(user.id, organizationId)
 
   if (
-    user.platformRole !== 'platform_admin' &&
     !hasRole(membership, ['owner', 'teacher']) &&
     !canReadDashboardResource(membership, 'students')
   ) {
@@ -245,26 +285,18 @@ organizationRoutes.post('/:organizationId/students', async (c) => {
   }
 
   const body = await c.req.json().catch(() => null)
-  const fullName = typeof body?.fullName === 'string' ? body.fullName.trim() : ''
-  const nisn = typeof body?.nisn === 'string' && body.nisn.trim() ? body.nisn.trim() : null
-  const email = typeof body?.email === 'string' && body.email.trim() ? body.email.trim().toLowerCase() : null
-  const phone = typeof body?.phone === 'string' && body.phone.trim() ? body.phone.trim() : null
-
-  if (!fullName) {
-    return c.json({ error: 'Student full name is required.' }, 400)
-  }
-
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return c.json({ error: 'Student email is not valid.' }, 400)
+  const parsedBody = studentFormSchema.safeParse(body)
+  if (!parsedBody.success) {
+    return c.json({ error: firstValidationMessage(parsedBody.error) }, 400)
   }
 
   try {
     const student = await createStudent({
-      email,
-      fullName,
-      nisn,
+      email: parsedBody.data.email,
+      fullName: parsedBody.data.fullName,
+      nisn: parsedBody.data.nisn,
       organizationId,
-      phone,
+      phone: parsedBody.data.phone,
     })
 
     return c.json({ student }, 201)
@@ -288,7 +320,7 @@ organizationRoutes.delete('/:organizationId/students/:studentId', async (c) => {
 
   const membership = await getOrganizationMembership(user.id, organizationId)
 
-  if (user.platformRole !== 'platform_admin' && !canManageDashboardResource(membership, 'students')) {
+  if (!canManageDashboardResource(membership, 'students')) {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
@@ -319,21 +351,21 @@ organizationRoutes.post('/:organizationId/students/:studentId/credential', async
 
   const membership = await getOrganizationMembership(user.id, organizationId)
 
-  if (user.platformRole !== 'platform_admin' && !canManageDashboardResource(membership, 'students')) {
+  if (!canManageDashboardResource(membership, 'students')) {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
   const body = await c.req.json().catch(() => null)
-  const username =
-    typeof body?.username === 'string' && body.username.trim()
-      ? body.username.trim()
-      : undefined
+  const parsedBody = studentCredentialSchema.safeParse(body)
+  if (!parsedBody.success) {
+    return c.json({ error: firstValidationMessage(parsedBody.error) }, 400)
+  }
 
   try {
     const credential = await createStudentCredential({
       organizationId,
       studentId,
-      username,
+      username: parsedBody.data.username,
     })
 
     return c.json({ credential })
@@ -429,39 +461,19 @@ organizationRoutes.post('/:organizationId/classes', async (c) => {
   }
 
   const body = await c.req.json().catch(() => null)
-  const name = typeof body?.name === 'string' ? body.name.trim() : ''
-  const code = typeof body?.code === 'string' ? body.code.trim() : ''
-  const academicYear = typeof body?.academicYear === 'string' ? body.academicYear.trim() : ''
-  const capacity = Number(body?.capacity ?? 30)
-  const homeroomTeacherId =
-    typeof body?.homeroomTeacherId === 'string' && body.homeroomTeacherId.trim()
-      ? body.homeroomTeacherId.trim()
-      : null
-
-  if (!name) {
-    return c.json({ error: 'Class name is required.' }, 400)
-  }
-
-  if (!code) {
-    return c.json({ error: 'Class code is required.' }, 400)
-  }
-
-  if (!academicYear) {
-    return c.json({ error: 'Academic year is required.' }, 400)
-  }
-
-  if (!Number.isInteger(capacity) || capacity < 1 || capacity > 200) {
-    return c.json({ error: 'Class capacity must be between 1 and 200.' }, 400)
+  const parsedBody = classFormSchema.safeParse(body)
+  if (!parsedBody.success) {
+    return c.json({ error: firstValidationMessage(parsedBody.error) }, 400)
   }
 
   try {
     const schoolClass = await createOrganizationClass({
       organizationId,
-      name,
-      code,
-      academicYear,
-      capacity,
-      homeroomTeacherId,
+      name: parsedBody.data.name,
+      code: parsedBody.data.code,
+      academicYear: parsedBody.data.academicYear,
+      capacity: parsedBody.data.capacity,
+      homeroomTeacherId: parsedBody.data.homeroomTeacherId,
     })
 
     return c.json({ class: schoolClass }, 201)
@@ -490,42 +502,21 @@ organizationRoutes.patch('/:organizationId/classes/:classId', async (c) => {
   }
 
   const body = await c.req.json().catch(() => null)
-  const name = typeof body?.name === 'string' ? body.name.trim() : ''
-  const code = typeof body?.code === 'string' ? body.code.trim() : ''
-  const academicYear = typeof body?.academicYear === 'string' ? body.academicYear.trim() : ''
-  const capacity = Number(body?.capacity ?? 30)
-  const status = body?.status === 'archived' ? 'archived' : 'active'
-  const homeroomTeacherId =
-    typeof body?.homeroomTeacherId === 'string' && body.homeroomTeacherId.trim()
-      ? body.homeroomTeacherId.trim()
-      : null
-
-  if (!name) {
-    return c.json({ error: 'Class name is required.' }, 400)
-  }
-
-  if (!code) {
-    return c.json({ error: 'Class code is required.' }, 400)
-  }
-
-  if (!academicYear) {
-    return c.json({ error: 'Academic year is required.' }, 400)
-  }
-
-  if (!Number.isInteger(capacity) || capacity < 1 || capacity > 200) {
-    return c.json({ error: 'Class capacity must be between 1 and 200.' }, 400)
+  const parsedBody = classUpdateSchema.safeParse(body)
+  if (!parsedBody.success) {
+    return c.json({ error: firstValidationMessage(parsedBody.error) }, 400)
   }
 
   try {
     const schoolClass = await updateOrganizationClass({
       classId,
       organizationId,
-      name,
-      code,
-      academicYear,
-      capacity,
-      status,
-      homeroomTeacherId,
+      name: parsedBody.data.name,
+      code: parsedBody.data.code,
+      academicYear: parsedBody.data.academicYear,
+      capacity: parsedBody.data.capacity,
+      status: parsedBody.data.status,
+      homeroomTeacherId: parsedBody.data.homeroomTeacherId,
     })
 
     return c.json({ class: schoolClass })
@@ -593,23 +584,17 @@ organizationRoutes.post('/:organizationId/classes/:classId/announcements', async
   }
 
   const body = await c.req.json().catch(() => null)
-  const title = typeof body?.title === 'string' ? body.title.trim() : ''
-  const announcementBody = typeof body?.body === 'string' ? body.body.trim() : ''
-
-  if (!title) {
-    return c.json({ error: 'Announcement title is required.' }, 400)
-  }
-
-  if (!announcementBody) {
-    return c.json({ error: 'Announcement body is required.' }, 400)
+  const parsedBody = classAnnouncementSchema.safeParse(body)
+  if (!parsedBody.success) {
+    return c.json({ error: firstValidationMessage(parsedBody.error) }, 400)
   }
 
   try {
     const announcement = await createClassAnnouncement({
-      body: announcementBody,
+      body: parsedBody.data.body,
       classId,
       membership,
-      title,
+      title: parsedBody.data.title,
       userId: user.id,
     })
 
@@ -644,24 +629,18 @@ organizationRoutes.patch('/:organizationId/classes/:classId/announcements/:annou
   }
 
   const body = await c.req.json().catch(() => null)
-  const title = typeof body?.title === 'string' ? body.title.trim() : ''
-  const announcementBody = typeof body?.body === 'string' ? body.body.trim() : ''
-
-  if (!title) {
-    return c.json({ error: 'Announcement title is required.' }, 400)
-  }
-
-  if (!announcementBody) {
-    return c.json({ error: 'Announcement body is required.' }, 400)
+  const parsedBody = classAnnouncementSchema.safeParse(body)
+  if (!parsedBody.success) {
+    return c.json({ error: firstValidationMessage(parsedBody.error) }, 400)
   }
 
   try {
     const announcement = await updateClassAnnouncement({
       announcementId,
-      body: announcementBody,
+      body: parsedBody.data.body,
       classId,
       membership,
-      title,
+      title: parsedBody.data.title,
     })
 
     return c.json({ announcement })
@@ -730,7 +709,6 @@ organizationRoutes.get('/:organizationId/teachers', async (c) => {
   const membership = await getOrganizationMembership(user.id, organizationId)
 
   if (
-    user.platformRole !== 'platform_admin' &&
     !hasRole(membership, ['owner']) &&
     !canReadDashboardResource(membership, 'teachers')
   ) {
@@ -762,31 +740,17 @@ organizationRoutes.post('/:organizationId/teachers', async (c) => {
   }
 
   const body = await c.req.json().catch(() => null)
-  const name = typeof body?.name === 'string' ? body.name.trim() : ''
-  const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
-  const password =
-    typeof body?.password === 'string' && body.password.trim()
-      ? body.password
-      : null
-
-  if (!name) {
-    return c.json({ error: 'Teacher name is required.' }, 400)
-  }
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return c.json({ error: 'Teacher email is not valid.' }, 400)
-  }
-
-  if (password && password.length < 8) {
-    return c.json({ error: 'Teacher password must be at least 8 characters.' }, 400)
+  const parsedBody = teacherFormSchema.safeParse(body)
+  if (!parsedBody.success) {
+    return c.json({ error: firstValidationMessage(parsedBody.error) }, 400)
   }
 
   try {
     const teacher = await createTeacher({
-      email,
-      name,
+      email: parsedBody.data.email,
+      name: parsedBody.data.name,
       organizationId,
-      password,
+      password: parsedBody.data.password,
     })
 
     return c.json({ teacher }, 201)
@@ -810,7 +774,7 @@ organizationRoutes.delete('/:organizationId/teachers/:teacherId', async (c) => {
 
   const membership = await getOrganizationMembership(user.id, organizationId)
 
-  if (user.platformRole !== 'platform_admin' && !canManageDashboardResource(membership, 'teachers')) {
+  if (!canManageDashboardResource(membership, 'teachers')) {
     return c.json({ error: 'Forbidden' }, 403)
   }
 

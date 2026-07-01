@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@schoolhub/ui/components/dialog'
 import { Input } from '@schoolhub/ui/components/input'
+import { Skeleton } from '@schoolhub/ui/components/skeleton'
 import {
   Table,
   TableBody,
@@ -23,6 +24,12 @@ import {
 import { ChevronDown, ChevronRight, GraduationCap, Search, Trash2, UserCog, Users, type LucideIcon } from 'lucide-react'
 
 import { apiRequest } from '../../lib/api'
+import {
+  createAdminFormSchema,
+  createStudentFormSchema,
+  createTeacherFormSchema,
+  firstValidationMessage,
+} from '../../lib/form-validation'
 import { useDashboardRole } from '../../lib/role-context'
 import type { ActiveOrganization } from '../../lib/role-context'
 import { colors, dashboardColors } from '../../styles/colors'
@@ -214,14 +221,24 @@ export function OrganizationAdminsScreen({
     setCreateError(null)
 
     try {
+      const parsedForm = createAdminFormSchema.safeParse({
+        ...form,
+        permissions: form.accessMode === 'all' ? [] : form.permissions,
+      })
+      if (!parsedForm.success) {
+        setCreateError(firstValidationMessage(parsedForm.error))
+        setIsCreateBlocked(true)
+        return
+      }
+
       const response = await apiRequest<CreateAdminResponse>(`/api/organizations/${organization.id}/admins`, {
         method: 'POST',
         body: JSON.stringify({
-          name: form.name,
-          email: form.email,
-          password: form.password || undefined,
-          accessMode: form.accessMode,
-          permissions: form.accessMode === 'all' ? [] : form.permissions,
+          name: parsedForm.data.name,
+          email: parsedForm.data.email,
+          password: parsedForm.data.password,
+          accessMode: parsedForm.data.accessMode,
+          permissions: parsedForm.data.permissions,
         }),
       })
 
@@ -367,11 +384,11 @@ export function OrganizationAdminsScreen({
 
   return (
     <div className="w-full space-y-6">
-      <Card className={`rounded-[28px] ${dashboardColors.card}`}>
+      <Card className={`rounded-[2rem] ${dashboardColors.card}`}>
         <CardContent className="p-6 sm:p-8">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
             <div>
-              <p className={`text-sm font-bold uppercase tracking-[0.18em] ${colors.brand.text}`}>
+              <p className={`text-sm font-bold ${colors.brand.text}`}>
                 {organization.name}
               </p>
               <h1 className="mt-2 text-4xl font-bold tracking-tight">Admins</h1>
@@ -413,8 +430,8 @@ export function OrganizationAdminsScreen({
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell className={`h-28 text-center ${colors.app.muted}`} colSpan={6}>
-                      Loading admins...
+                    <TableCell className="p-4" colSpan={6}>
+                      <DirectoryTableSkeleton columns={5} rows={3} />
                     </TableCell>
                   </TableRow>
                 ) : null}
@@ -655,7 +672,7 @@ function Field({ children, label }: { children: ReactNode; label: string }) {
 
 function NoActiveOrganization({ icon: Icon }: { icon: LucideIcon }) {
   return (
-    <Card className={`rounded-[28px] ${dashboardColors.card}`}>
+    <Card className={`rounded-[2rem] ${dashboardColors.card}`}>
       <CardContent className="p-8">
         <Icon className={`mb-4 h-10 w-10 ${colors.warning.icon}`} />
         <h1 className="text-3xl font-bold">No active organization</h1>
@@ -782,7 +799,7 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
   })
   const { role } = useDashboardRole()
   const canCreate = role === 'owner' || role === 'admin'
-  const canDelete = role === 'owner' || role === 'platform_admin' || role === 'admin'
+  const canDelete = role === 'owner' || role === 'admin'
   const selectedCount = selectedIds.size
   const allVisibleRowsSelected = rows.length > 0 && rows.every((row) => selectedIds.has(row.id))
   const endpoint = useMemo(() => {
@@ -962,24 +979,38 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
 
     try {
       if (kind === 'students') {
+        const parsedForm = createStudentFormSchema.safeParse(studentForm)
+        if (!parsedForm.success) {
+          setCreateError(firstValidationMessage(parsedForm.error))
+          setIsCreateBlocked(true)
+          return
+        }
+
         const response = await apiRequest<CreateStudentResponse>(`/api/organizations/${organization.id}/students`, {
           method: 'POST',
           body: JSON.stringify({
-            fullName: studentForm.fullName,
-            nisn: studentForm.nisn || undefined,
-            email: studentForm.email || undefined,
-            phone: studentForm.phone || undefined,
+            fullName: parsedForm.data.fullName,
+            nisn: parsedForm.data.nisn,
+            email: parsedForm.data.email,
+            phone: parsedForm.data.phone,
           }),
         })
 
         setRows((currentRows) => [response.student as unknown as T, ...currentRows])
       } else {
+        const parsedForm = createTeacherFormSchema.safeParse(teacherForm)
+        if (!parsedForm.success) {
+          setCreateError(firstValidationMessage(parsedForm.error))
+          setIsCreateBlocked(true)
+          return
+        }
+
         const response = await apiRequest<CreateTeacherResponse>(`/api/organizations/${organization.id}/teachers`, {
           method: 'POST',
           body: JSON.stringify({
-            name: teacherForm.name,
-            email: teacherForm.email,
-            password: teacherForm.password || undefined,
+            name: parsedForm.data.name,
+            email: parsedForm.data.email,
+            password: parsedForm.data.password,
           }),
         })
 
@@ -1021,7 +1052,7 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
 
   if (!organization) {
     return (
-      <Card className={`rounded-[28px] ${dashboardColors.card}`}>
+      <Card className={`rounded-[2rem] ${dashboardColors.card}`}>
         <CardContent className="p-8">
           <Icon className={`mb-4 h-10 w-10 ${colors.warning.icon}`} />
           <h1 className="text-3xl font-bold">No active organization</h1>
@@ -1035,11 +1066,11 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
 
   return (
     <div className="w-full space-y-6">
-      <Card className={`rounded-[28px] ${dashboardColors.card}`}>
+      <Card className={`rounded-[2rem] ${dashboardColors.card}`}>
         <CardContent className="p-6 sm:p-8">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
             <div>
-              <p className={`text-sm font-bold uppercase tracking-[0.18em] ${colors.brand.text}`}>
+              <p className={`text-sm font-bold ${colors.brand.text}`}>
                 {organization.name}
               </p>
               <h1 className="mt-2 text-4xl font-bold tracking-tight">{title}</h1>
@@ -1135,8 +1166,8 @@ function OrganizationDirectoryScreen<T extends { id: string }>({
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell className={`h-28 text-center ${colors.app.muted}`} colSpan={columns.length + (canDelete ? 1 : 0) + (kind === 'students' && canDelete ? 1 : 0)}>
-                      Loading {kind}...
+                    <TableCell className="p-4" colSpan={columns.length + (canDelete ? 1 : 0) + (kind === 'students' && canDelete ? 1 : 0)}>
+                      <DirectoryTableSkeleton columns={Math.min(columns.length + 1, 6)} rows={4} />
                     </TableCell>
                   </TableRow>
                 ) : null}
@@ -1360,6 +1391,29 @@ function StatusBadge({ status }: { status: string }) {
   }
 
   return <Badge className={colors.brand.badge}>{status}</Badge>
+}
+
+function DirectoryTableSkeleton({
+  columns,
+  rows,
+}: {
+  columns: number
+  rows: number
+}) {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: rows }).map((_, rowIndex) => (
+        <div key={rowIndex} className="grid gap-3 md:grid-cols-6">
+          {Array.from({ length: columns }).map((__, columnIndex) => (
+            <Skeleton
+              key={`${rowIndex}-${columnIndex}`}
+              className="schoolhub-skeleton h-10 rounded-2xl bg-[#dff4eb]"
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function formatPermissionLabels(permissions: string[]) {

@@ -4,26 +4,26 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 132 33% 98%;
+    --foreground: 191 46% 15%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 191 46% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
+    --popover-foreground: 191 46% 15%;
+    --primary: 164 58% 27%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --secondary: 142 45% 95%;
+    --secondary-foreground: 191 46% 15%;
+    --muted: 142 45% 95%;
+    --muted-foreground: 191 16% 38%;
+    --accent: 142 45% 95%;
+    --accent-foreground: 191 46% 15%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --border: 143 30% 87%;
+    --input: 143 30% 87%;
+    --ring: 164 58% 27%;
+    --radius: 0.75rem;
   }
 
   * {
@@ -38,6 +38,127 @@
 
 html {
   scroll-behavior: smooth;
+}
+
+.schoolhub-page {
+  background:
+    linear-gradient(135deg, rgb(247 251 248 / 0.98), rgb(238 247 241 / 0.78) 48%, rgb(247 251 248 / 0.96)),
+    linear-gradient(90deg, rgb(139 216 189 / 0.08), transparent 34%, rgb(18 52 59 / 0.035)),
+    #f7fbf8;
+  position: relative;
+}
+
+.schoolhub-page::before {
+  background-image:
+    linear-gradient(rgb(18 52 59 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(18 52 59 / 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+  content: "";
+  inset: 0;
+  mask-image: linear-gradient(to bottom, black, transparent 72%);
+  pointer-events: none;
+  position: absolute;
+}
+
+.schoolhub-card-hover {
+  transition:
+    transform 520ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 520ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.schoolhub-card-hover:hover {
+  border-color: #c7e4d7;
+  box-shadow: 0 24px 70px rgb(18 52 59 / 0.1);
+  transform: translateY(-4px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .schoolhub-reveal {
+    animation: schoolhub-rise 820ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: var(--delay, 0ms);
+  }
+
+  .schoolhub-rise {
+    animation: schoolhub-rise 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .schoolhub-float {
+    animation: schoolhub-float 6s cubic-bezier(0.32, 0.72, 0, 1) infinite;
+  }
+
+  .schoolhub-float-delay {
+    animation: schoolhub-float 6.5s cubic-bezier(0.32, 0.72, 0, 1) 900ms infinite;
+  }
+
+  .schoolhub-marquee {
+    animation: schoolhub-marquee 26s linear infinite;
+  }
+
+  .schoolhub-skeleton {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .schoolhub-skeleton::after {
+    animation: schoolhub-skeleton 1.7s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.72), transparent);
+    content: "";
+    inset: 0;
+    position: absolute;
+    transform: translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .schoolhub-rise,
+  .schoolhub-reveal,
+  .schoolhub-float,
+  .schoolhub-float-delay,
+  .schoolhub-marquee,
+  .schoolhub-skeleton::after {
+    animation: none;
+  }
+}
+
+@keyframes schoolhub-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes schoolhub-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes schoolhub-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes schoolhub-skeleton {
+  to {
+    transform: translateX(100%);
+  }
 }
 
 @layer components {

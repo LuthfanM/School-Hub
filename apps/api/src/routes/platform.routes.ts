@@ -1,5 +1,7 @@
 import { Hono } from 'hono'
+import { z } from 'zod'
 
+import { firstValidationMessage, optionalLowercaseEmail, optionalPassword, optionalTrimmedString } from '../lib/validation.js'
 import {
   createPlatformTenant,
   listPlatformTenants,
@@ -10,6 +12,30 @@ import {
 import type { AppEnv } from '../types/app-env.js'
 
 export const platformRoutes = new Hono<AppEnv>()
+
+const createTenantSchema = z.object({
+  name: z.string().trim().min(1, 'Tenant name is required.'),
+  slug: z.string().trim().toLowerCase().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug can only use lowercase letters, numbers, and hyphens.'),
+  description: optionalTrimmedString(),
+  customDomain: z.preprocess((value) => {
+    if (typeof value !== 'string') return null
+
+    const trimmed = value.trim()
+    return trimmed ? trimmed.toLowerCase() : null
+  }, z.string().nullable()),
+  firstAdminEmail: optionalLowercaseEmail('First admin email is not valid.'),
+  firstAdminPassword: optionalPassword('First admin password must be at least 8 characters.'),
+})
+
+const resetTenantAdminPasswordSchema = z.object({
+  email: optionalLowercaseEmail('Admin email is not valid.'),
+  redirectTo: z.preprocess((value) => {
+    if (typeof value !== 'string') return `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/auth/reset-password`
+
+    const trimmed = value.trim()
+    return trimmed || `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/auth/reset-password`
+  }, z.string()),
+})
 
 platformRoutes.use('*', async (c, next) => {
   const user = c.get('user')
@@ -30,53 +56,24 @@ platformRoutes.get('/tenants', async (c) => {
 platformRoutes.post('/tenants', async (c) => {
   const user = c.get('user')
   const body = await c.req.json().catch(() => null)
-  const name = typeof body?.name === 'string' ? body.name.trim() : ''
-  const slug = typeof body?.slug === 'string' ? body.slug.trim().toLowerCase() : ''
-  const description =
-    typeof body?.description === 'string' && body.description.trim()
-      ? body.description.trim()
-      : null
-  const customDomain =
-    typeof body?.customDomain === 'string' && body.customDomain.trim()
-      ? body.customDomain.trim().toLowerCase()
-      : null
-  const firstAdminEmail =
-    typeof body?.firstAdminEmail === 'string' && body.firstAdminEmail.trim()
-      ? body.firstAdminEmail.trim().toLowerCase()
-      : null
-  const firstAdminPassword =
-    typeof body?.firstAdminPassword === 'string' && body.firstAdminPassword.trim()
-      ? body.firstAdminPassword
-      : null
 
   if (!user) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
-  if (!name) {
-    return c.json({ error: 'Tenant name is required.' }, 400)
-  }
-
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
-    return c.json({ error: 'Slug can only use lowercase letters, numbers, and hyphens.' }, 400)
-  }
-
-  if (firstAdminEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(firstAdminEmail)) {
-    return c.json({ error: 'First admin email is not valid.' }, 400)
-  }
-
-  if (firstAdminPassword && firstAdminPassword.length < 8) {
-    return c.json({ error: 'First admin password must be at least 8 characters.' }, 400)
+  const parsedBody = createTenantSchema.safeParse(body)
+  if (!parsedBody.success) {
+    return c.json({ error: firstValidationMessage(parsedBody.error) }, 400)
   }
 
   try {
     const tenant = await createPlatformTenant({
-      name,
-      slug,
-      description,
-      customDomain,
-      firstAdminEmail,
-      firstAdminPassword,
+      name: parsedBody.data.name,
+      slug: parsedBody.data.slug,
+      description: parsedBody.data.description,
+      customDomain: parsedBody.data.customDomain,
+      firstAdminEmail: parsedBody.data.firstAdminEmail,
+      firstAdminPassword: parsedBody.data.firstAdminPassword,
       inviterId: user.id,
     })
 
@@ -93,24 +90,16 @@ platformRoutes.post('/tenants', async (c) => {
 platformRoutes.post('/tenants/:tenantId/reset-password', async (c) => {
   const tenantId = c.req.param('tenantId')
   const body = await c.req.json().catch(() => null)
-  const email =
-    typeof body?.email === 'string' && body.email.trim()
-      ? body.email.trim().toLowerCase()
-      : null
-  const redirectTo =
-    typeof body?.redirectTo === 'string' && body.redirectTo.trim()
-      ? body.redirectTo.trim()
-      : `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/auth/reset-password`
-
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return c.json({ error: 'Admin email is not valid.' }, 400)
+  const parsedBody = resetTenantAdminPasswordSchema.safeParse(body)
+  if (!parsedBody.success) {
+    return c.json({ error: firstValidationMessage(parsedBody.error) }, 400)
   }
 
   try {
     const reset = await requestTenantAdminPasswordReset({
-      email,
+      email: parsedBody.data.email,
       organizationId: tenantId,
-      redirectTo,
+      redirectTo: parsedBody.data.redirectTo,
     })
 
     return c.json({ reset })

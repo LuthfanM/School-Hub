@@ -59,9 +59,9 @@ function ChooseOrganizationPage() {
   }
 
   return (
-    <main className={`min-h-screen p-4 sm:p-8 ${dashboardColors.page}`}>
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-4xl items-center">
-        <Card className={`w-full rounded-[28px] ${dashboardColors.card}`}>
+    <main className={`min-h-[100dvh] p-4 sm:p-8 ${dashboardColors.page}`}>
+      <div className="mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-4xl items-center">
+        <Card className={`w-full rounded-[2rem] ${dashboardColors.card}`}>
           <CardHeader className="p-6 sm:p-8">
             <div className={`mb-5 grid h-12 w-12 place-items-center rounded-2xl ${colors.brand.badge}`}>
               <Building2 className="h-6 w-6" />
@@ -92,6 +92,7 @@ function ChooseOrganizationPage() {
                     <div className="flex items-center gap-2">
                       <Badge className={colors.success.badge}>{membership.role}</Badge>
                       <Button
+                        className="rounded-full bg-[#12343b] text-white hover:bg-[#1d4b52]"
                         disabled={isSubmitting}
                         type="button"
                         onClick={() => chooseOrganization(membership.organization.id)}

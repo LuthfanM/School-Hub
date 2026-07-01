@@ -10,8 +10,8 @@ export const Route = createFileRoute('/dashboard/students/success')({
 
 function StudentSuccessPage() {
   return (
-    <main className={`grid min-h-screen place-items-center p-4 ${dashboardColors.page}`}>
-      <Card className={`max-w-xl rounded-[28px] text-center ${dashboardColors.card}`}>
+    <main className={`grid min-h-[100dvh] place-items-center p-4 ${dashboardColors.page}`}>
+      <Card className={`max-w-xl rounded-[2rem] text-center ${dashboardColors.card}`}>
         <CardContent className="p-8">
         <CheckCircle2 className={`mx-auto mb-5 h-14 w-14 ${colors.success.icon}`} />
         <h1 className="text-3xl font-bold">Student added successfully.</h1>

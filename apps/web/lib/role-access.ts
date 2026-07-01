@@ -121,7 +121,7 @@ export const screens: Record<DashboardSection, ScreenConfig> = {
     label: 'Students',
     description: 'Manage academic student records and student account links.',
     icon: Users,
-    allowedRoles: ['platform_admin', 'owner', 'admin', 'teacher'],
+    allowedRoles: ['owner', 'admin', 'teacher'],
   },
   admins: {
     section: 'admins',
@@ -135,7 +135,7 @@ export const screens: Record<DashboardSection, ScreenConfig> = {
     label: 'Teachers',
     description: 'Manage teacher members and teaching assignments.',
     icon: GraduationCap,
-    allowedRoles: ['platform_admin', 'owner', 'admin'],
+    allowedRoles: ['owner', 'admin'],
   },
   classes: {
     section: 'classes',

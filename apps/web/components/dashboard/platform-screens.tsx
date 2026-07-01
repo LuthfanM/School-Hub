@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Badge } from '@schoolhub/ui/components/badge'
 import { Button } from '@schoolhub/ui/components/button'
 import { Card, CardContent } from '@schoolhub/ui/components/card'
+import { Skeleton } from '@schoolhub/ui/components/skeleton'
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,7 @@ import {
 } from 'lucide-react'
 
 import { apiRequest } from '../../lib/api'
+import { createTenantFormSchema, firstValidationMessage } from '../../lib/form-validation'
 import { colors, dashboardColors } from '../../styles/colors'
 
 interface PlatformTenant {
@@ -190,15 +192,21 @@ export function PlatformTenantsScreen() {
     setError(null)
 
     try {
+      const parsedForm = createTenantFormSchema.safeParse(form)
+      if (!parsedForm.success) {
+        setError(firstValidationMessage(parsedForm.error))
+        return
+      }
+
       const response = await apiRequest<PlatformTenantCreateResponse>('/api/platform/tenants', {
         method: 'POST',
         body: JSON.stringify({
-          name: form.name,
-          slug: form.slug,
-          description: form.description || undefined,
-          customDomain: form.customDomain || undefined,
-          firstAdminEmail: form.firstAdminEmail || undefined,
-          firstAdminPassword: form.firstAdminPassword || undefined,
+          name: parsedForm.data.name,
+          slug: parsedForm.data.slug,
+          description: parsedForm.data.description,
+          customDomain: parsedForm.data.customDomain,
+          firstAdminEmail: parsedForm.data.firstAdminEmail,
+          firstAdminPassword: parsedForm.data.firstAdminPassword,
         }),
       })
 
@@ -238,11 +246,11 @@ export function PlatformTenantsScreen() {
 
   return (
     <div className="w-full space-y-6">
-      <Card className={`rounded-[28px] ${dashboardColors.card}`}>
+      <Card className={`rounded-[2rem] ${dashboardColors.card}`}>
         <CardContent className="p-6 sm:p-8">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
             <div>
-              <p className={`text-sm font-bold uppercase tracking-[0.18em] ${colors.brand.text}`}>Platform</p>
+              <p className={`text-sm font-bold ${colors.brand.text}`}>Platform</p>
               <h1 className="mt-2 text-4xl font-bold tracking-tight">Tenants</h1>
               <p className={`mt-3 max-w-2xl ${colors.app.muted}`}>
                 Create school workspaces, invite the first organization admin, and manage tenant status without opening tenant-private academic data.
@@ -286,8 +294,18 @@ export function PlatformTenantsScreen() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className={`h-28 text-center ${colors.app.muted}`}>
-                      Loading tenants...
+                    <TableCell colSpan={7} className="p-4">
+                      <div className="space-y-3">
+                        {[1, 2, 3].map((row) => (
+                          <div key={row} className="grid gap-3 md:grid-cols-[1.2fr_0.8fr_0.7fr_1fr_0.7fr]">
+                            <Skeleton className="schoolhub-skeleton h-10 rounded-2xl bg-[#dff4eb]" />
+                            <Skeleton className="schoolhub-skeleton h-10 rounded-2xl bg-[#dff4eb]" />
+                            <Skeleton className="schoolhub-skeleton h-10 rounded-2xl bg-[#dff4eb]" />
+                            <Skeleton className="schoolhub-skeleton h-10 rounded-2xl bg-[#dff4eb]" />
+                            <Skeleton className="schoolhub-skeleton h-10 rounded-2xl bg-[#dff4eb]" />
+                          </div>
+                        ))}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : null}
@@ -389,11 +407,11 @@ export function PlatformTenantsScreen() {
 export function PlatformSettingsScreen() {
   return (
     <div className="w-full space-y-6">
-      <Card className={`rounded-[28px] ${dashboardColors.card}`}>
+      <Card className={`rounded-[2rem] ${dashboardColors.card}`}>
         <CardContent className="p-6 sm:p-8">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
             <div>
-              <p className={`text-sm font-bold uppercase tracking-[0.18em] ${colors.brand.text}`}>Platform</p>
+              <p className={`text-sm font-bold ${colors.brand.text}`}>Platform</p>
               <h1 className="mt-2 text-4xl font-bold tracking-tight">Platform Settings</h1>
               <p className={`mt-3 max-w-2xl ${colors.app.muted}`}>
                 Global SaaS configuration for onboarding, authentication, operational safety, and future billing.

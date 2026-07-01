@@ -38,15 +38,15 @@ export const Route = createFileRoute('/dashboard/students/new')({
 
 function AddStudentPage() {
   return (
-    <main className={`min-h-screen p-4 sm:p-8 ${dashboardColors.page}`}>
+    <main className={`min-h-[100dvh] p-4 sm:p-8 ${dashboardColors.page}`}>
       <div className="mx-auto max-w-3xl">
         <Link to="/dashboard" className={`mb-5 inline-flex items-center gap-2 text-sm font-semibold ${colors.app.muted} ${colors.app.foregroundHover}`}>
           <ArrowLeft className="h-4 w-4" />
           Back to dashboard
         </Link>
-        <Card className={`rounded-[28px] ${dashboardColors.card}`}>
+        <Card className={`rounded-[2rem] ${dashboardColors.card}`}>
           <CardHeader className="p-6 sm:p-8">
-            <CardDescription className={`font-bold uppercase tracking-[0.18em] ${colors.brand.text}`}>Students</CardDescription>
+            <CardDescription className={`font-bold ${colors.brand.text}`}>Students</CardDescription>
             <CardTitle className="text-4xl">Add Student</CardTitle>
             <CardDescription className={`text-base ${colors.app.muted}`}>Dummy form state for adding a first student. Submit routes to the success screen.</CardDescription>
           </CardHeader>
@@ -82,10 +82,10 @@ function AddStudentPage() {
             <p className={`text-sm ${colors.app.muted}`}>File upload placeholder for bulk student import.</p>
           </div>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Button asChild>
+            <Button asChild className="rounded-full bg-[#12343b] text-white hover:bg-[#1d4b52]">
               <Link to="/dashboard/students/success">Add Student</Link>
             </Button>
-            <Button asChild variant="secondary">
+            <Button asChild variant="outline" className="rounded-full border-[#d8e5df] bg-white/82">
               <Link to="/dashboard/$section" params={{ section: 'students' }}>Cancel</Link>
             </Button>
           </div>

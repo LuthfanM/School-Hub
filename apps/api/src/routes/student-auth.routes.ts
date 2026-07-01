@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
+import { z } from 'zod'
 
+import { firstValidationMessage } from '../lib/validation.js'
 import {
   changeStudentPassword,
   loginStudent,
@@ -12,21 +14,29 @@ import type { AppEnv } from '../types/app-env.js'
 
 export const studentAuthRoutes = new Hono<AppEnv>()
 
+const studentLoginSchema = z.object({
+  schoolCode: z.string().trim().toLowerCase().min(1, 'Student credentials are invalid.'),
+  studentId: z.string().trim().min(1, 'Student credentials are invalid.'),
+  password: z.string().min(1, 'Student credentials are invalid.'),
+})
+
+const studentChangePasswordSchema = z.object({
+  newPassword: z.string().min(8, 'Password must be at least 8 characters.'),
+})
+
 studentAuthRoutes.post('/student-auth/login', async (c) => {
   const body = await c.req.json().catch(() => null)
-  const schoolCode = typeof body?.schoolCode === 'string' ? body.schoolCode.trim().toLowerCase() : ''
-  const studentId = typeof body?.studentId === 'string' ? body.studentId.trim() : ''
-  const password = typeof body?.password === 'string' ? body.password : ''
+  const parsedBody = studentLoginSchema.safeParse(body)
 
-  if (!schoolCode || !studentId || !password) {
-    return c.json({ error: 'Student credentials are invalid.' }, 400)
+  if (!parsedBody.success) {
+    return c.json({ error: firstValidationMessage(parsedBody.error) }, 400)
   }
 
   try {
     const result = await loginStudent({
-      password,
-      schoolCode,
-      studentId,
+      password: parsedBody.data.password,
+      schoolCode: parsedBody.data.schoolCode,
+      studentId: parsedBody.data.studentId,
     })
 
     setCookie(c, STUDENT_SESSION_COOKIE, result.token, {
@@ -59,11 +69,14 @@ studentAuthRoutes.post('/student-auth/change-password', async (c) => {
   }
 
   const body = await c.req.json().catch(() => null)
-  const newPassword = typeof body?.newPassword === 'string' ? body.newPassword : ''
+  const parsedBody = studentChangePasswordSchema.safeParse(body)
+  if (!parsedBody.success) {
+    return c.json({ error: firstValidationMessage(parsedBody.error) }, 400)
+  }
 
   try {
     await changeStudentPassword({
-      newPassword,
+      newPassword: parsedBody.data.newPassword,
       studentId: studentSession.studentId,
     })
 

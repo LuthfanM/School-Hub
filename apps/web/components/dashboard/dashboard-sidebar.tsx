@@ -16,13 +16,13 @@ export function DashboardSidebar() {
     : 'overview'
 
   return (
-    <aside className={`flex h-full flex-col justify-between border-r p-4 ${dashboardColors.card}`}>
+    <aside className={`flex h-full flex-col justify-between rounded-[2rem] border p-4 ${dashboardColors.card}`}>
       <div>
         <Link to="/" className="mb-8 flex items-center gap-3 px-2">
-          <span className={`grid h-10 w-10 place-items-center rounded-2xl text-sm font-bold text-white ${colors.app.dark}`}>C</span>
+          <span className={`grid h-10 w-10 place-items-center rounded-2xl text-sm font-bold text-white shadow-[0_18px_40px_rgba(18,52,59,0.18)] ${colors.app.dark}`}>SH</span>
           <span>
-            <span className="block text-xl font-bold leading-none">SchoolHub</span>
-            <span className={`text-xs ${colors.app.muted}`}>School Hub</span>
+            <span className="block text-xl font-bold leading-none text-[#15313a]">SchoolHub</span>
+            <span className={`text-xs ${colors.app.muted}`}>School tenant SaaS</span>
           </span>
         </Link>
         <Separator className={`mb-4 ${colors.app.borderBg}`} />
@@ -38,7 +38,7 @@ export function DashboardSidebar() {
                   : dashboardColors.inactiveNav
               }`}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-4 w-4 shrink-0" />
               {label}
             </Link>
           ))}
@@ -49,7 +49,7 @@ export function DashboardSidebar() {
         <Link
           to={role === 'platform_admin' ? '/dashboard/$section' : '/demo'}
           params={role === 'platform_admin' ? { section: 'platform-settings' } : undefined}
-          className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium ${dashboardColors.inactiveNav}`}
+          className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition ${dashboardColors.inactiveNav}`}
         >
           <HelpCircle className="h-4 w-4" />
           Help center

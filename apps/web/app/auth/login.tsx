@@ -6,6 +6,7 @@ import { Input } from '@schoolhub/ui/components/input'
 import { apiRequest, getApiBaseUrl } from '../../lib/api'
 import { getAuthRedirectTarget } from '../../lib/auth-redirect'
 import { authClient, signOut } from '../../lib/auth-client'
+import { firstValidationMessage, staffLoginFormSchema } from '../../lib/form-validation'
 
 export const Route = createFileRoute('/auth/login')({
   loader: async () => {
@@ -36,7 +37,14 @@ function LoginPage() {
     setError(null)
     setIsSubmitting(true)
 
-    const blockedMessage = await getLoginContextMessage(email)
+    const parsedForm = staffLoginFormSchema.safeParse({ email, password })
+    if (!parsedForm.success) {
+      setError(firstValidationMessage(parsedForm.error))
+      setIsSubmitting(false)
+      return
+    }
+
+    const blockedMessage = await getLoginContextMessage(parsedForm.data.email)
 
     if (blockedMessage) {
       setError(blockedMessage)
@@ -45,8 +53,8 @@ function LoginPage() {
     }
 
     const { error } = await authClient.signIn.email({
-      email,
-      password,
+      email: parsedForm.data.email,
+      password: parsedForm.data.password,
     })
 
     if (error) {
@@ -93,17 +101,20 @@ function LoginPage() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[#F7F4EE] p-4 text-[#151515]">
-      <Card className="w-full max-w-md rounded-[28px] border-[#E5DED3] bg-white">
+    <main className="schoolhub-page grid min-h-[100dvh] place-items-center p-4 text-[#15313a]">
+      <Card className="w-full max-w-md rounded-[2rem] border-[#d8e5df] bg-white/92 shadow-[0_24px_70px_rgba(18,52,59,0.10)]">
         <CardHeader className="p-8 pb-0">
-          <Link to="/" className="text-sm font-semibold text-[#2563EB]">SchoolHub</Link>
-          <CardTitle className="mt-5 text-3xl">Login</CardTitle>
-          <CardDescription className="text-base text-[#6F6A62]">Sign in to your school workspace.</CardDescription>
+          <Link to="/" className="inline-flex items-center gap-3 text-sm font-semibold text-[#1d6d54]">
+            <span className="grid h-9 w-9 place-items-center rounded-2xl bg-[#12343b] text-xs font-bold text-white">SH</span>
+            SchoolHub
+          </Link>
+          <CardTitle className="mt-6 text-3xl text-[#15313a]">Login</CardTitle>
+          <CardDescription className="text-base text-[#526a70]">Sign in to your school workspace.</CardDescription>
         </CardHeader>
         <CardContent className="p-8">
         <form className="space-y-4" onSubmit={handleSubmit}>
           <Input
-            className="h-12 rounded-2xl border-[#E5DED3] bg-[#F7F4EE]"
+            className="h-12 rounded-2xl border-[#d8e5df] bg-[#f7fbf8]"
             onChange={(event) => setEmail(event.target.value)}
             placeholder="admin@school.edu"
             required
@@ -111,7 +122,7 @@ function LoginPage() {
             value={email}
           />
           <Input
-            className="h-12 rounded-2xl border-[#E5DED3] bg-[#F7F4EE]"
+            className="h-12 rounded-2xl border-[#d8e5df] bg-[#f7fbf8]"
             onChange={(event) => setPassword(event.target.value)}
             placeholder="Password"
             required
@@ -119,15 +130,15 @@ function LoginPage() {
             value={password}
           />
           {error ? <p className="text-sm font-medium text-red-600">{error}</p> : null}
-          <Button className="w-full" disabled={isSubmitting} type="submit">
+          <Button className="w-full rounded-full bg-[#12343b] text-white hover:bg-[#1d4b52]" disabled={isSubmitting} type="submit">
             {isSubmitting ? 'Logging in...' : 'Login'}
           </Button>
         </form>
-        <p className="mt-6 text-sm text-[#6F6A62]">
-          New school? <Link to="/auth/register" className="font-semibold text-[#2563EB]">Create account</Link>
+        <p className="mt-6 text-sm text-[#526a70]">
+          New school? <Link to="/auth/register" className="font-semibold text-[#1d6d54]">Create account</Link>
         </p>
-        <p className="mt-3 text-sm text-[#6F6A62]">
-          Student account? <Link to="/auth/student-login" className="font-semibold text-[#2563EB]">Login as student</Link>
+        <p className="mt-3 text-sm text-[#526a70]">
+          Student account? <Link to="/auth/student-login" className="font-semibold text-[#1d6d54]">Login as student</Link>
         </p>
         </CardContent>
       </Card>
