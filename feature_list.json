@@ -1,0 +1,256 @@
+{
+  "features": [
+    {
+      "id": "better-auth-foundation",
+      "name": "Better Auth foundation",
+      "status": "implemented",
+      "description": "Better Auth is wired into the Hono API with Prisma adapter, email/password auth, organization plugin, session endpoint, and frontend auth client."
+    },
+    {
+      "id": "zod-validation-foundation",
+      "name": "Zod validation foundation",
+      "status": "implemented",
+      "description": "Zod is installed in the API and web workspaces. Core API request payloads and primary auth, tenant, directory, class, and announcement forms now use Zod schemas for normalization and validation before processing or submitting."
+    },
+    {
+      "id": "postgres-prisma-foundation",
+      "name": "PostgreSQL Prisma foundation",
+      "status": "implemented",
+      "description": "Prisma 7 targets PostgreSQL and includes Better Auth tables plus SchoolHub LMS domain tables. The database package uses prisma.config.ts, generated client output under packages/database/src/generated/prisma, and the @prisma/adapter-pg driver adapter."
+    },
+    {
+      "id": "academic-student-records",
+      "name": "Academic student records",
+      "status": "implemented",
+      "description": "Students are modeled as SchoolHub academic records in the students table, with optional link to Better Auth user accounts for future quiz/login access."
+    },
+    {
+      "id": "student-owned-enrollment-progress",
+      "name": "Student-based enrollment and progress",
+      "status": "implemented",
+      "description": "Course enrollments and lesson progress now reference students.id instead of user.id."
+    },
+    {
+      "id": "student-permissions",
+      "name": "Student authorization permissions",
+      "status": "implemented",
+      "description": "Better Auth access control includes a student resource with create/read/read-own/update/delete/link-user permissions assigned by role. Teacher access is read-only for student records and enrollment; student creation/linking/enrollment is reserved for owner or permitted admins."
+    },
+    {
+      "id": "platform-admin-seed",
+      "name": "Platform admin seed",
+      "status": "implemented",
+      "description": "A seed script creates a Better Auth email/password account and marks it as platform_admin using user.platformRole."
+    },
+    {
+      "id": "deployment-steps-doc",
+      "name": "Deployment steps documentation",
+      "status": "implemented",
+      "description": "Deploy_Steps.md documents local environment setup, database schema push, Prisma generation, platform admin seeding, and Better Auth password storage behavior."
+    },
+    {
+      "id": "dashboard-section-navigation",
+      "name": "Dashboard section navigation",
+      "status": "implemented",
+      "description": "Dashboard sidebar links now render nested section pages via Outlet and highlight the active section from the current URL."
+    },
+    {
+      "id": "roles-permissions-policy",
+      "name": "Roles and permissions policy",
+      "status": "implemented",
+      "description": "ROLES_AND_PERMISSIONS.md and tugas_role.md clarify platform admin vs organization roles, per-role allowed/blocked responsibilities, permission scope, dashboard screen access, API guard rules, and support access boundaries."
+    },
+    {
+      "id": "role-aware-dashboard-navigation",
+      "name": "Role-aware dashboard navigation",
+      "status": "implemented",
+      "description": "Dashboard navigation filters visible screens by active role, reads platform_admin from a TanStack Start SSR session loader, persists the temporary organization-role selector locally, and redirects blocked routes to an allowed screen."
+    },
+    {
+      "id": "dashboard-component-structure",
+      "name": "Dashboard component structure",
+      "status": "implemented",
+      "description": "Dashboard route logic, SSR session loading, shell layout, sidebar, header, overview, and role notices are split into focused files following the web app structure."
+    },
+    {
+      "id": "dashboard-color-tokens",
+      "name": "Dashboard color tokens",
+      "status": "implemented",
+      "description": "Dashboard color classes are centralized in apps/web/styles/colors.ts and reused by dashboard, platform admin, section, and student dashboard screens."
+    },
+    {
+      "id": "root-not-found-screen",
+      "name": "Root not found screen",
+      "status": "implemented",
+      "description": "The root route defines a styled notFoundComponent so TanStack Router no longer falls back to the generic 404."
+    },
+    {
+      "id": "role-specific-dashboard-overviews",
+      "name": "Role-specific dashboard overviews",
+      "status": "implemented",
+      "description": "The dashboard renders separate overview content for platform admin, organization admin, teacher, and student roles."
+    },
+    {
+      "id": "platform-admin-dashboard",
+      "name": "Platform admin dashboard",
+      "status": "implemented",
+      "description": "Platform admin has a Summary screen plus dedicated Tenants and Platform Settings frontend screens aligned with tenant provisioning, first-admin invitation, tenant status review, support boundaries, and future billing configuration. Platform admin is excluded from tenant Students and Teachers screens unless a future explicit support-access flow is built."
+    },
+    {
+      "id": "platform-admin-api-routes",
+      "name": "Platform admin API routes",
+      "status": "implemented",
+      "description": "Platform admin can list tenants and create tenants through Hono API routes guarded by user.platformRole = platform_admin. Tenant creation can also create a pending first-admin invitation record."
+    },
+    {
+      "id": "platform-tenant-seed",
+      "name": "Platform tenant seed",
+      "status": "implemented",
+      "description": "A seed script populates sample organization tenants, creates Better Auth password-backed owner accounts for active/suspended tenants using SEED_TENANT_OWNER_PASSWORD, creates owner member rows, and leaves pending_setup tenants as pending first-admin invitations."
+    },
+    {
+      "id": "platform-tenant-data-seed",
+      "name": "Platform tenant sample data seed",
+      "status": "implemented",
+      "description": "A platform tenant data seed populates every active or suspended tenant with sample organization admins, teachers, students, student login credentials, classes, rosters, subjects, and class announcements. The script is idempotent and runs after platform admin and platform tenant seeds."
+    },
+    {
+      "id": "platform-tenant-management-screen",
+      "name": "Platform tenant management screen",
+      "status": "implemented",
+      "description": "The platform tenants screen loads tenant data from the API, uses an in-page modal for tenant creation, supports platform-admin-triggered first-admin password reset links, and shows empty, loading, error, search, and setup queue states without hardcoded tenant rows."
+    },
+    {
+      "id": "platform-admin-password-reset",
+      "name": "Platform admin password reset",
+      "status": "implemented",
+      "description": "Platform admins can trigger a Better Auth password reset for a tenant owner/admin from the Platform Tenants page. Until Resend is implemented, the API captures and returns a development reset link that opens /auth/reset-password; the same flow can later send the link by email."
+    },
+    {
+      "id": "development-first-admin-provisioning",
+      "name": "Development first admin provisioning",
+      "status": "implemented",
+      "description": "Before Resend is implemented, platform tenant creation can accept a first admin email plus password to create the Better Auth user/account, create the organization owner member row, accept the invitation, and activate the tenant for local testing."
+    },
+    {
+      "id": "tenant-owner-role",
+      "name": "Tenant owner role for first admin",
+      "status": "implemented",
+      "description": "The first organization admin is now provisioned as member.role = owner, and Better Auth organization creatorRole is set to owner. Additional tenant admins can be modeled separately as member.role = admin later."
+    },
+    {
+      "id": "session-backed-organization-role",
+      "name": "Session-backed organization role",
+      "status": "implemented",
+      "description": "The session endpoint returns organization memberships and activeMembership. Active membership now prioritizes owner, then admin, teacher, and student so owner-only menus are visible when a user has an owner membership. Summary pages also display dashboard role, platformRole, organizationRole, and role source for debugging."
+    },
+    {
+      "id": "dashboard-logout-action",
+      "name": "Dashboard logout action",
+      "status": "implemented",
+      "description": "Dashboard sidebar and profile menu logout actions now call Better Auth signOut, clear the local dashboard role preview, and redirect to the login page."
+    },
+    {
+      "id": "tenant-status-login-guard",
+      "name": "Tenant status login guard",
+      "status": "implemented",
+      "description": "Login and dashboard session resolution now distinguish active, suspended, and pending_setup tenants. The login form prechecks tenant context before sign-in, blocks suspended tenants with an explicit error, and shows pending setup invitees a clear pending setup message instead of a generic invalid credentials error."
+    },
+    {
+      "id": "auth-route-session-redirect",
+      "name": "Auth route session redirect",
+      "status": "implemented",
+      "description": "The login route checks the existing session cookie before rendering and redirects users with a platform session or active organization membership directly to the dashboard."
+    },
+    {
+      "id": "multi-tenant-organization-selection",
+      "name": "Multi-tenant organization selection",
+      "status": "implemented",
+      "description": "Users with more than one active organization membership are no longer auto-assigned to the first tenant or a previously saved tenant during login. The session payload returns hasMultipleActiveMemberships and requiresOrganizationSelection, active organization choice is stored on user.activeOrganizationId after selection, and the web app routes multi-tenant users through /choose-organization before opening the dashboard."
+    },
+    {
+      "id": "organization-directory-pages",
+      "name": "Organization students and teachers pages",
+      "status": "implemented",
+      "description": "Owner/admin-accessible dashboard Students and Teachers pages load tenant-scoped data through organization API routes with server-side pagination, search, loading, empty, and error states. Owners and permitted admins can create student records and teacher members from in-page modals. Owner and permitted admin users can select rows and delete student records or teacher memberships; platform admins do not get implicit tenant directory access. Students supports status filtering and Teachers supports email-status filtering."
+    },
+    {
+      "id": "tenant-safe-user-provisioning",
+      "name": "Tenant-safe user provisioning",
+      "status": "implemented",
+      "description": "Admin and teacher provisioning can attach an existing global Better Auth user to a new tenant without overwriting global identity fields or leaking cross-tenant existence in API responses. Existing memberships in the same tenant return tenant-scoped duplicate/access errors instead of silently changing roles."
+    },
+    {
+      "id": "create-member-modal-error-lock",
+      "name": "Create member modal error lock",
+      "status": "implemented",
+      "description": "Admin, teacher, and student create dialogs now show creation failures inside the modal and disable the submit button after a failed request until the user changes an input or cancels the dialog."
+    },
+    {
+      "id": "i18n-language-preference-foundation",
+      "name": "i18n language preference foundation",
+      "status": "implemented",
+      "description": "The web app initializes i18next/react-i18next with English, Indonesian, Japanese, and Korean JSON resources. User language preference is stored on user.language, returned in the session payload, and can be updated through the session language preference API."
+    },
+    {
+      "id": "classes-management",
+      "name": "Classes management",
+      "status": "partial",
+      "description": "Classes now have Prisma models, tenant-scoped API list/detail/create/update/delete routes, role-scoped visibility for owner/admin/teacher/student, class announcements as separate records with create/edit/delete, and a dashboard Classes screen with card/table views, create/edit/delete actions, and detail tabs for roster, timetable, subjects, and overview. Roster assignment, subject assignment, real attendance capture, parent role access, and promote/bulk-import workflows still need implementation."
+    },
+    {
+      "id": "owner-admin-management",
+      "name": "Owner admin management",
+      "status": "implemented",
+      "description": "Organization owners can open an Admins dashboard page, add and delete organization admins, and assign or modify all-access or selected dashboard menu permissions using checkbox controls."
+    },
+    {
+      "id": "member-permission-table",
+      "name": "Member permission table",
+      "status": "implemented",
+      "description": "Prisma schema includes member_permissions for per-member resource/action permissions, currently used for owner-managed organization admin dashboard access."
+    },
+    {
+      "id": "api-module-structure",
+      "name": "API module structure",
+      "status": "implemented",
+      "description": "The Hono API is split into app bootstrap, route modules, service modules, middleware, shared types, and pagination utilities so src/index.ts only starts the server."
+    },
+    {
+      "id": "github-ci-validation",
+      "name": "GitHub CI validation workflow",
+      "status": "implemented",
+      "description": "GitHub Actions CI is aligned with the npm workspace monorepo by installing with npm ci, generating Prisma Client, typechecking API and web workspaces directly, and building the Turborepo project."
+    },
+    {
+      "id": "prd-stack-alignment",
+      "name": "PRD stack alignment",
+      "status": "implemented",
+      "description": "PRD - School Hub.md now reflects Hono, Better Auth, Prisma, PostgreSQL, planned Resend invitations, owner/admin role split, and member_permissions instead of Supabase-era assumptions."
+    },
+    {
+      "id": "landing-page-redesign",
+      "name": "Modern school landing page redesign",
+      "status": "implemented",
+      "description": "The public landing page has been redesigned with a trusted modern school SaaS direction, shared shadcn-style UI primitives from @schoolhub/ui, a floating pill navigation, double-bezel product preview surfaces, asymmetric workflow sections, reduced-motion-safe animations, a module marquee, and layout-matched skeleton loading inside the hero product preview."
+    },
+    {
+      "id": "auth-dashboard-style-alignment",
+      "name": "Auth and dashboard visual alignment",
+      "status": "implemented",
+      "description": "Auth pages, demo, 404, organization chooser, dashboard shell/sidebar/header, dashboard color tokens, and key table loading states now follow the landing page's trusted school SaaS style with deep teal and sage surfaces, rounded shadcn-style components, reduced old beige/blue hardcoding, and skeleton loaders replacing generic table loading text."
+    },
+    {
+      "id": "student-api-routes",
+      "name": "Student API routes",
+      "status": "partial",
+      "description": "Tenant-scoped paginated student listing and student record creation are implemented. Student update/delete, link-user, enrollment, and progress routes still need implementation."
+    },
+    {
+      "id": "student-nisn-login",
+      "name": "Student NIS/NISN login",
+      "status": "implemented",
+      "description": "Students can log in without email using school code, NIS/NISN username, and a per-student password. Owner/admin users can create or reset student login credentials from the Students table; temporary passwords are generated, shown once, hashed with scrypt, locked after repeated failures, and require password change on first login."
+    }
+  ]
+}
